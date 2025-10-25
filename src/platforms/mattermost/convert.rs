@@ -31,7 +31,7 @@ impl ConversionContext {
 /// Convert a Mattermost timestamp (milliseconds since epoch) to DateTime<Utc>
 fn timestamp_to_datetime(timestamp_ms: i64) -> DateTime<Utc> {
     DateTime::from_timestamp(timestamp_ms / 1000, ((timestamp_ms % 1000) * 1_000_000) as u32)
-        .unwrap_or_else(|| Utc::now())
+        .unwrap_or_else(Utc::now)
 }
 
 impl MattermostUser {

@@ -59,7 +59,7 @@ impl MattermostPlatform {
         if mm_channel.channel_type.is_direct() {
             if let Some(user_id) = current_user_id {
                 // Check if this is a self-DM (saved messages) - both user IDs are the same
-                if mm_channel.name == format!("{}__{}", user_id, user_id) {
+                if mm_channel.name == format!("{user_id}__{user_id}") {
                     // This is a DM with yourself
                     channel.display_name = "You (Saved Messages)".to_string();
                 } else if let Some(partner_id) = get_dm_partner_id(&mm_channel.name, user_id) {
@@ -78,7 +78,7 @@ impl MattermostPlatform {
                         }
                         Err(e) => {
                             // Log error but don't fail the whole operation
-                            eprintln!("Failed to fetch DM partner user {}: {}", partner_id, e);
+                            eprintln!("Failed to fetch DM partner user {partner_id}: {e}");
                             // Fall back to a generic name
                             channel.display_name = "Direct Message".to_string();
                         }
@@ -298,7 +298,7 @@ impl Platform for MattermostPlatform {
         // Use the stored server URL
         let server_url = &self.server_url;
 
-        let mut ws_manager = WebSocketManager::new(&server_url, token);
+        let mut ws_manager = WebSocketManager::new(server_url, token);
         ws_manager.connect().await?;
 
         let mut ws_lock = self.websocket.lock().await;
@@ -457,7 +457,7 @@ impl Platform for MattermostPlatform {
             // For simplicity, using a basic conversion
             use chrono::{DateTime, Utc};
             let datetime = DateTime::<Utc>::from_timestamp(ts, 0)
-                .unwrap_or_else(|| Utc::now());
+                .unwrap_or_else(Utc::now);
             datetime.to_rfc3339()
         });
 

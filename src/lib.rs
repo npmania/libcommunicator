@@ -471,7 +471,7 @@ pub unsafe extern "C" fn communicator_platform_connect(
         Err(e) => {
             error::set_last_error(Error::new(
                 ErrorCode::InvalidArgument,
-                &format!("Invalid config JSON: {}", e),
+                format!("Invalid config JSON: {e}"),
             ));
             return ErrorCode::InvalidArgument;
         }
@@ -563,7 +563,7 @@ pub unsafe extern "C" fn communicator_platform_get_connection_info(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize connection info: {}", e),
+                    format!("Failed to serialize connection info: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -632,7 +632,7 @@ pub unsafe extern "C" fn communicator_platform_send_message(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize message: {}", e),
+                    format!("Failed to serialize message: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -674,7 +674,7 @@ pub unsafe extern "C" fn communicator_platform_get_channels(handle: PlatformHand
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize channels: {}", e),
+                    format!("Failed to serialize channels: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -729,7 +729,7 @@ pub unsafe extern "C" fn communicator_platform_get_channel(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize channel: {}", e),
+                    format!("Failed to serialize channel: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -785,7 +785,7 @@ pub unsafe extern "C" fn communicator_platform_get_messages(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize messages: {}", e),
+                    format!("Failed to serialize messages: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -840,7 +840,7 @@ pub unsafe extern "C" fn communicator_platform_get_channel_members(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize users: {}", e),
+                    format!("Failed to serialize users: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -895,7 +895,7 @@ pub unsafe extern "C" fn communicator_platform_get_user(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize user: {}", e),
+                    format!("Failed to serialize user: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -937,7 +937,7 @@ pub unsafe extern "C" fn communicator_platform_get_current_user(handle: Platform
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize user: {}", e),
+                    format!("Failed to serialize user: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -992,7 +992,7 @@ pub unsafe extern "C" fn communicator_platform_create_direct_channel(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize channel: {}", e),
+                    format!("Failed to serialize channel: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1037,7 +1037,7 @@ pub unsafe extern "C" fn communicator_platform_get_teams(handle: PlatformHandle)
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize teams: {}", e),
+                    format!("Failed to serialize teams: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1092,7 +1092,7 @@ pub unsafe extern "C" fn communicator_platform_get_team(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize team: {}", e),
+                    format!("Failed to serialize team: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1214,7 +1214,7 @@ pub unsafe extern "C" fn communicator_platform_get_user_status(
                 Err(e) => {
                     error::set_last_error(Error::new(
                         ErrorCode::Unknown,
-                        &format!("Failed to serialize status: {}", e),
+                        format!("Failed to serialize status: {e}"),
                     ));
                     std::ptr::null_mut()
                 }
@@ -1513,7 +1513,7 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                 Err(e) => {
                     error::set_last_error(Error::new(
                         ErrorCode::Unknown,
-                        &format!("Failed to serialize event: {}", e),
+                        format!("Failed to serialize event: {e}"),
                     ));
                     std::ptr::null_mut()
                 }
@@ -1599,7 +1599,7 @@ pub unsafe extern "C" fn communicator_platform_send_reply(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize message: {}", e),
+                    format!("Failed to serialize message: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1665,7 +1665,7 @@ pub unsafe extern "C" fn communicator_platform_update_message(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize message: {}", e),
+                    format!("Failed to serialize message: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1756,7 +1756,7 @@ pub unsafe extern "C" fn communicator_platform_get_message(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize message: {}", e),
+                    format!("Failed to serialize message: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1812,7 +1812,7 @@ pub unsafe extern "C" fn communicator_platform_search_messages(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize messages: {}", e),
+                    format!("Failed to serialize messages: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1879,7 +1879,7 @@ pub unsafe extern "C" fn communicator_platform_get_messages_before(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize messages: {}", e),
+                    format!("Failed to serialize messages: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -1946,7 +1946,7 @@ pub unsafe extern "C" fn communicator_platform_get_messages_after(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize messages: {}", e),
+                    format!("Failed to serialize messages: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2012,7 +2012,7 @@ pub unsafe extern "C" fn communicator_platform_get_channel_by_name(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize channel: {}", e),
+                    format!("Failed to serialize channel: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2057,7 +2057,7 @@ pub unsafe extern "C" fn communicator_platform_create_group_channel(
         Err(e) => {
             error::set_last_error(Error::new(
                 ErrorCode::InvalidArgument,
-                &format!("Invalid user IDs JSON: {}", e),
+                format!("Invalid user IDs JSON: {e}"),
             ));
             return std::ptr::null_mut();
         }
@@ -2080,7 +2080,7 @@ pub unsafe extern "C" fn communicator_platform_create_group_channel(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize channel: {}", e),
+                    format!("Failed to serialize channel: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2229,7 +2229,7 @@ pub unsafe extern "C" fn communicator_platform_get_user_by_username(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize user: {}", e),
+                    format!("Failed to serialize user: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2284,7 +2284,7 @@ pub unsafe extern "C" fn communicator_platform_get_user_by_email(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize user: {}", e),
+                    format!("Failed to serialize user: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2329,7 +2329,7 @@ pub unsafe extern "C" fn communicator_platform_get_users_by_ids(
         Err(e) => {
             error::set_last_error(Error::new(
                 ErrorCode::InvalidArgument,
-                &format!("Invalid user IDs JSON: {}", e),
+                format!("Invalid user IDs JSON: {e}"),
             ));
             return std::ptr::null_mut();
         }
@@ -2352,7 +2352,7 @@ pub unsafe extern "C" fn communicator_platform_get_users_by_ids(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize users: {}", e),
+                    format!("Failed to serialize users: {e}"),
                 ));
                 std::ptr::null_mut()
             }
@@ -2407,7 +2407,7 @@ pub unsafe extern "C" fn communicator_platform_set_custom_status(
         Err(e) => {
             error::set_last_error(Error::new(
                 ErrorCode::InvalidArgument,
-                &format!("Invalid custom status JSON: {}", e),
+                format!("Invalid custom status JSON: {e}"),
             ));
             return ErrorCode::InvalidArgument;
         }
@@ -2485,7 +2485,7 @@ pub unsafe extern "C" fn communicator_platform_get_users_status(
         Err(e) => {
             error::set_last_error(Error::new(
                 ErrorCode::InvalidArgument,
-                &format!("Invalid user IDs JSON: {}", e),
+                format!("Invalid user IDs JSON: {e}"),
             ));
             return std::ptr::null_mut();
         }
@@ -2524,7 +2524,7 @@ pub unsafe extern "C" fn communicator_platform_get_users_status(
                 Err(e) => {
                     error::set_last_error(Error::new(
                         ErrorCode::Unknown,
-                        &format!("Failed to serialize status map: {}", e),
+                        format!("Failed to serialize status map: {e}"),
                     ));
                     std::ptr::null_mut()
                 }
@@ -2581,7 +2581,7 @@ pub unsafe extern "C" fn communicator_platform_get_team_by_name(
             Err(e) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize team: {}", e),
+                    format!("Failed to serialize team: {e}"),
                 ));
                 std::ptr::null_mut()
             }

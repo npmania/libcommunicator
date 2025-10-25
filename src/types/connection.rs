@@ -29,6 +29,7 @@ pub struct ConnectionInfo {
 /// Connection state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ConnectionState {
     /// Currently connecting/authenticating
     Connecting,
@@ -37,6 +38,7 @@ pub enum ConnectionState {
     /// Connection is being closed
     Disconnecting,
     /// Not connected
+    #[default]
     Disconnected,
     /// Connection failed or encountered an error
     Error,
@@ -103,11 +105,6 @@ impl ConnectionInfo {
     }
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        ConnectionState::Disconnected
-    }
-}
 
 #[cfg(test)]
 mod tests {

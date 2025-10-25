@@ -51,7 +51,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing a list of channels or an Error
     pub async fn get_channels_for_team(&self, team_id: &str) -> Result<Vec<MattermostChannel>> {
-        let endpoint = format!("/users/me/teams/{}/channels", team_id);
+        let endpoint = format!("/users/me/teams/{team_id}/channels");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -64,7 +64,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the channel information or an Error
     pub async fn get_channel(&self, channel_id: &str) -> Result<MattermostChannel> {
-        let endpoint = format!("/channels/{}", channel_id);
+        let endpoint = format!("/channels/{channel_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -78,7 +78,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the channel information or an Error
     pub async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<MattermostChannel> {
-        let endpoint = format!("/teams/{}/channels/name/{}", team_id, channel_name);
+        let endpoint = format!("/teams/{team_id}/channels/name/{channel_name}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -128,7 +128,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing a list of channel members or an Error
     pub async fn get_channel_members(&self, channel_id: &str) -> Result<Vec<ChannelMember>> {
-        let endpoint = format!("/channels/{}/members", channel_id);
+        let endpoint = format!("/channels/{channel_id}/members");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -142,7 +142,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the channel member information or an Error
     pub async fn get_channel_member(&self, channel_id: &str, user_id: &str) -> Result<ChannelMember> {
-        let endpoint = format!("/channels/{}/members/{}", channel_id, user_id);
+        let endpoint = format!("/channels/{channel_id}/members/{user_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -160,7 +160,7 @@ impl MattermostClient {
             "user_id": user_id,
         });
 
-        let endpoint = format!("/channels/{}/members", channel_id);
+        let endpoint = format!("/channels/{channel_id}/members");
         let response = self.post(&endpoint, &body).await?;
         self.handle_response(response).await
     }
@@ -174,7 +174,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result indicating success or failure
     pub async fn remove_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
-        let endpoint = format!("/channels/{}/members/{}", channel_id, user_id);
+        let endpoint = format!("/channels/{channel_id}/members/{user_id}");
         let response = self.delete(&endpoint).await?;
 
         if response.status().is_success() {
@@ -182,7 +182,7 @@ impl MattermostClient {
         } else {
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::NetworkError,
-                &format!("Failed to remove channel member: {}", response.status()),
+                format!("Failed to remove channel member: {}", response.status()),
             ))
         }
     }

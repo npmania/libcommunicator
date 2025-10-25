@@ -12,7 +12,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the user information or an Error
     pub async fn get_user(&self, user_id: &str) -> Result<MattermostUser> {
-        let endpoint = format!("/users/{}", user_id);
+        let endpoint = format!("/users/{user_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -34,7 +34,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the user information or an Error
     pub async fn get_user_by_username(&self, username: &str) -> Result<MattermostUser> {
-        let endpoint = format!("/users/username/{}", username);
+        let endpoint = format!("/users/username/{username}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -47,7 +47,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the user information or an Error
     pub async fn get_user_by_email(&self, email: &str) -> Result<MattermostUser> {
-        let endpoint = format!("/users/email/{}", email);
+        let endpoint = format!("/users/email/{email}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }

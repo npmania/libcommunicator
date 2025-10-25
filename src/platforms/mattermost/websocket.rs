@@ -109,7 +109,7 @@ impl WebSocketManager {
         let ws_url = base_url
             .replace("https://", "wss://")
             .replace("http://", "ws://");
-        let ws_url = format!("{}/api/v4/websocket", ws_url);
+        let ws_url = format!("{ws_url}/api/v4/websocket");
 
         // Create bounded channel for events with configured size
         let (event_tx, event_rx) = mpsc::channel(config.max_queue_size);
@@ -194,7 +194,7 @@ impl WebSocketManager {
         if let Some(ws) = writer.as_mut() {
             ws.send(message)
                 .await
-                .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to send WebSocket message: {}", e)))?;
+                .map_err(|e| Error::new(ErrorCode::NetworkError, format!("Failed to send WebSocket message: {e}")))?;
             Ok(())
         } else {
             Err(Error::new(ErrorCode::InvalidState, "WebSocket not connected"))
@@ -224,7 +224,7 @@ impl WebSocketManager {
                 tokio::spawn(async move {
                     *state.lock().await = ConnectionState::Disconnected;
                 });
-                Error::new(ErrorCode::NetworkError, &format!("WebSocket connection failed: {}", e))
+                Error::new(ErrorCode::NetworkError, format!("WebSocket connection failed: {e}"))
             })?;
 
         let (mut write, read) = ws_stream.split();
@@ -246,12 +246,12 @@ impl WebSocketManager {
         };
 
         let auth_msg = serde_json::to_string(&auth_challenge)
-            .map_err(|e| Error::new(ErrorCode::Unknown, &format!("Failed to serialize auth: {}", e)))?;
+            .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to serialize auth: {e}")))?;
 
         write
             .send(Message::Text(auth_msg))
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to send auth: {}", e)))?;
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("Failed to send auth: {e}")))?;
 
         // Store the write half for bidirectional communication
         *self.ws_writer.lock().await = Some(write);
@@ -294,14 +294,14 @@ impl WebSocketManager {
                         match msg {
                             Some(Ok(Message::Text(text))) => {
                                 if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
-                                    eprintln!("Error handling WebSocket message: {}", e);
+                                    eprintln!("Error handling WebSocket message: {e}");
                                 }
                             }
                             Some(Ok(Message::Ping(data))) => {
                                 // Respond to ping with pong
                                 if let Some(writer) = ws_writer.lock().await.as_mut() {
                                     if let Err(e) = writer.send(Message::Pong(data)).await {
-                                        eprintln!("Failed to send pong: {}", e);
+                                        eprintln!("Failed to send pong: {e}");
                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                         *ws_writer.lock().await = None;
                                         break;
@@ -318,7 +318,7 @@ impl WebSocketManager {
                                 break;
                             }
                             Some(Err(e)) => {
-                                eprintln!("WebSocket error: {}", e);
+                                eprintln!("WebSocket error: {e}");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
@@ -336,7 +336,7 @@ impl WebSocketManager {
                     _ = ping_timer.tick() => {
                         if let Some(writer) = ws_writer.lock().await.as_mut() {
                             if let Err(e) = writer.send(Message::Ping(vec![])).await {
-                                eprintln!("Failed to send ping: {}", e);
+                                eprintln!("Failed to send ping: {e}");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
@@ -369,7 +369,7 @@ impl WebSocketManager {
                     // Check if we've exceeded max attempts
                     if let Some(max_attempts) = config.max_reconnect_attempts {
                         if attempt_num >= max_attempts {
-                            eprintln!("Max reconnection attempts ({}) reached, giving up", max_attempts);
+                            eprintln!("Max reconnection attempts ({max_attempts}) reached, giving up");
                             *connection_state.lock().await = ConnectionState::Disconnected;
                             break;
                         }
@@ -435,13 +435,13 @@ impl WebSocketManager {
                                                 match msg {
                                                     Some(Ok(Message::Text(text))) => {
                                                         if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
-                                                            eprintln!("Error handling WebSocket message: {}", e);
+                                                            eprintln!("Error handling WebSocket message: {e}");
                                                         }
                                                     }
                                                     Some(Ok(Message::Ping(data))) => {
                                                         if let Some(writer) = ws_writer.lock().await.as_mut() {
                                                             if let Err(e) = writer.send(Message::Pong(data)).await {
-                                                                eprintln!("Failed to send pong: {}", e);
+                                                                eprintln!("Failed to send pong: {e}");
                                                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                                                 *ws_writer.lock().await = None;
                                                                 break 'message_loop;
@@ -456,7 +456,7 @@ impl WebSocketManager {
                                                         break 'message_loop;
                                                     }
                                                     Some(Err(e)) => {
-                                                        eprintln!("WebSocket error: {}", e);
+                                                        eprintln!("WebSocket error: {e}");
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
@@ -473,7 +473,7 @@ impl WebSocketManager {
                                             _ = ping_timer.tick() => {
                                                 if let Some(writer) = ws_writer.lock().await.as_mut() {
                                                     if let Err(e) = writer.send(Message::Ping(vec![])).await {
-                                                        eprintln!("Failed to send ping: {}", e);
+                                                        eprintln!("Failed to send ping: {e}");
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
@@ -522,8 +522,8 @@ impl WebSocketManager {
             .map_err(|e| {
                 // Log raw message snippet for debugging (first 200 chars)
                 let snippet = &text[..text.len().min(200)];
-                eprintln!("Failed to parse WebSocket event: {} | Raw: {}", e, snippet);
-                Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e))
+                eprintln!("Failed to parse WebSocket event: {e} | Raw: {snippet}");
+                Error::new(ErrorCode::Unknown, format!("Failed to parse WebSocket event: {e}"))
             })?;
 
         // Check for sequence gaps
@@ -548,7 +548,7 @@ impl WebSocketManager {
             match event_tx.try_send(platform_event) {
                 Ok(_) => {} // Event sent successfully
                 Err(mpsc::error::TrySendError::Full(event)) => {
-                    eprintln!("WARNING: Event queue is full, dropping event: {:?}", event);
+                    eprintln!("WARNING: Event queue is full, dropping event: {event:?}");
                 }
                 Err(mpsc::error::TrySendError::Closed(_)) => {
                     // Receiver dropped, silently ignore
@@ -572,10 +572,10 @@ impl WebSocketManager {
                             let message = post.into();
                             return Some(PlatformEvent::MessagePosted(message));
                         } else {
-                            eprintln!("Failed to deserialize post JSON: {}", post_str);
+                            eprintln!("Failed to deserialize post JSON: {post_str}");
                         }
                     } else {
-                        eprintln!("Post data is not a string: {:?}", post_data);
+                        eprintln!("Post data is not a string: {post_data:?}");
                     }
                 }
                 eprintln!("Failed to parse 'posted' event data");
@@ -591,10 +591,10 @@ impl WebSocketManager {
                             let message = post.into();
                             return Some(PlatformEvent::MessageUpdated(message));
                         } else {
-                            eprintln!("Failed to deserialize post JSON: {}", post_str);
+                            eprintln!("Failed to deserialize post JSON: {post_str}");
                         }
                     } else {
-                        eprintln!("Post data is not a string: {:?}", post_data);
+                        eprintln!("Post data is not a string: {post_data:?}");
                     }
                 }
                 eprintln!("Failed to parse 'post_edited' event data");
@@ -609,11 +609,11 @@ impl WebSocketManager {
                         if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             post.id
                         } else {
-                            eprintln!("Failed to deserialize post JSON for deletion: {}", post_str);
+                            eprintln!("Failed to deserialize post JSON for deletion: {post_str}");
                             String::new()
                         }
                     } else {
-                        eprintln!("Post data is not a string: {:?}", post_data);
+                        eprintln!("Post data is not a string: {post_data:?}");
                         String::new()
                     }
                 } else {
@@ -842,7 +842,7 @@ impl WebSocketManager {
                 let user_id = ws_event.data.get("user")
                     .and_then(|v| v.get("id"))
                     .and_then(|v| v.as_str())
-                    .unwrap_or_else(|| {
+                    .unwrap_or({
                         if !ws_event.broadcast.user_id.is_empty() {
                             ws_event.broadcast.user_id.as_str()
                         } else {

@@ -32,12 +32,12 @@ impl MattermostClient {
     /// A Result containing the MattermostClient or an Error
     pub fn new(base_url: &str) -> Result<Self> {
         let base_url = Url::parse(base_url)
-            .map_err(|e| Error::new(ErrorCode::InvalidArgument, &format!("Invalid URL: {}", e)))?;
+            .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Invalid URL: {e}")))?;
 
         let http_client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             http_client,
@@ -90,7 +90,7 @@ impl MattermostClient {
 
     /// Get the current connection state
     pub async fn get_state(&self) -> ConnectionState {
-        self.state.read().await.clone()
+        *self.state.read().await
     }
 
     /// Get connection information
@@ -123,7 +123,7 @@ impl MattermostClient {
     pub fn api_url(&self, endpoint: &str) -> String {
         let endpoint = endpoint.trim_start_matches('/');
         let base = self.base_url.as_str().trim_end_matches('/');
-        format!("{}/api/v4/{}", base, endpoint)
+        format!("{base}/api/v4/{endpoint}")
     }
 
     /// Make a GET request to the Mattermost API
@@ -144,7 +144,7 @@ impl MattermostClient {
         request
             .send()
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("GET request failed: {}", e)))
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("GET request failed: {e}")))
     }
 
     /// Make a POST request to the Mattermost API
@@ -167,7 +167,7 @@ impl MattermostClient {
             .json(body)
             .send()
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("POST request failed: {}", e)))
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("POST request failed: {e}")))
     }
 
     /// Make a PUT request to the Mattermost API
@@ -190,7 +190,7 @@ impl MattermostClient {
             .json(body)
             .send()
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("PUT request failed: {}", e)))
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("PUT request failed: {e}")))
     }
 
     /// Make a DELETE request to the Mattermost API
@@ -211,7 +211,7 @@ impl MattermostClient {
         request
             .send()
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("DELETE request failed: {}", e)))
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("DELETE request failed: {e}")))
     }
 
     /// Check if the response is successful and extract the JSON body
@@ -228,7 +228,7 @@ impl MattermostClient {
             response
                 .json::<T>()
                 .await
-                .map_err(|e| Error::new(ErrorCode::Unknown, &format!("Failed to parse response: {}", e)))
+                .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to parse response: {e}")))
         } else {
             let error_text = response
                 .text()
@@ -237,7 +237,7 @@ impl MattermostClient {
 
             Err(Error::new(
                 ErrorCode::NetworkError,
-                &format!("API request failed with status {}: {}", status, error_text),
+                format!("API request failed with status {status}: {error_text}"),
             ))
         }
     }

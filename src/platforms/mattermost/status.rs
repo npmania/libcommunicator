@@ -28,7 +28,7 @@ impl MattermostClient {
             status: status.to_string(),
         };
 
-        let endpoint = format!("/users/{}/status", user_id);
+        let endpoint = format!("/users/{user_id}/status");
         let response = self.put(&endpoint, &request).await?;
         self.handle_response(response).await
     }
@@ -44,7 +44,7 @@ impl MattermostClient {
     /// # API Endpoint
     /// GET /users/{user_id}/status
     pub async fn get_user_status(&self, user_id: &str) -> Result<MattermostStatus> {
-        let endpoint = format!("/users/{}/status", user_id);
+        let endpoint = format!("/users/{user_id}/status");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -86,7 +86,7 @@ impl MattermostClient {
             )
         })?;
 
-        let endpoint = format!("/users/{}/status/custom", user_id);
+        let endpoint = format!("/users/{user_id}/status/custom");
         let response = self.put(&endpoint, &custom_status).await?;
 
         if response.status().is_success() {
@@ -94,7 +94,7 @@ impl MattermostClient {
         } else {
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::NetworkError,
-                &format!("Failed to set custom status: {}", response.status()),
+                format!("Failed to set custom status: {}", response.status()),
             ))
         }
     }
@@ -114,7 +114,7 @@ impl MattermostClient {
             )
         })?;
 
-        let endpoint = format!("/users/{}/status/custom", user_id);
+        let endpoint = format!("/users/{user_id}/status/custom");
         let response = self.delete(&endpoint).await?;
 
         if response.status().is_success() {
@@ -122,7 +122,7 @@ impl MattermostClient {
         } else {
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::NetworkError,
-                &format!("Failed to remove custom status: {}", response.status()),
+                format!("Failed to remove custom status: {}", response.status()),
             ))
         }
     }

@@ -39,10 +39,12 @@ pub struct Team {
 
 /// Team type/visibility
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum TeamType {
     /// Open team - anyone can join
     Open,
     /// Invite-only team
+    #[default]
     Invite,
 }
 
@@ -96,11 +98,6 @@ impl Team {
     }
 }
 
-impl Default for TeamType {
-    fn default() -> Self {
-        TeamType::Invite
-    }
-}
 
 #[cfg(test)]
 mod tests {

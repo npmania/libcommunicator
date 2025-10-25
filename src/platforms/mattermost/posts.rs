@@ -44,7 +44,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the post or an Error
     pub async fn get_post(&self, post_id: &str) -> Result<MattermostPost> {
-        let endpoint = format!("/posts/{}", post_id);
+        let endpoint = format!("/posts/{post_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -64,7 +64,7 @@ impl MattermostClient {
         page: u32,
         per_page: u32,
     ) -> Result<PostList> {
-        let endpoint = format!("/channels/{}/posts?page={}&per_page={}", channel_id, page, per_page);
+        let endpoint = format!("/channels/{channel_id}/posts?page={page}&per_page={per_page}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -95,7 +95,7 @@ impl MattermostClient {
             "message": message,
         });
 
-        let endpoint = format!("/posts/{}", post_id);
+        let endpoint = format!("/posts/{post_id}");
         let response = self.put(&endpoint, &body).await?;
         self.handle_response(response).await
     }
@@ -108,7 +108,7 @@ impl MattermostClient {
     /// # Returns
     /// A Result indicating success or failure
     pub async fn delete_post(&self, post_id: &str) -> Result<()> {
-        let endpoint = format!("/posts/{}", post_id);
+        let endpoint = format!("/posts/{post_id}");
         let response = self.delete(&endpoint).await?;
 
         if response.status().is_success() {
@@ -116,7 +116,7 @@ impl MattermostClient {
         } else {
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::NetworkError,
-                &format!("Failed to delete post: {}", response.status()),
+                format!("Failed to delete post: {}", response.status()),
             ))
         }
     }
@@ -135,7 +135,7 @@ impl MattermostClient {
             "is_or_search": false,
         });
 
-        let endpoint = format!("/teams/{}/posts/search", team_id);
+        let endpoint = format!("/teams/{team_id}/posts/search");
         let response = self.post(&endpoint, &body).await?;
         self.handle_response(response).await
     }
@@ -156,8 +156,7 @@ impl MattermostClient {
         per_page: u32,
     ) -> Result<PostList> {
         let endpoint = format!(
-            "/channels/{}/posts?before={}&per_page={}",
-            channel_id, post_id, per_page
+            "/channels/{channel_id}/posts?before={post_id}&per_page={per_page}"
         );
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
@@ -179,8 +178,7 @@ impl MattermostClient {
         per_page: u32,
     ) -> Result<PostList> {
         let endpoint = format!(
-            "/channels/{}/posts?after={}&per_page={}",
-            channel_id, post_id, per_page
+            "/channels/{channel_id}/posts?after={post_id}&per_page={per_page}"
         );
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await

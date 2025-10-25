@@ -28,7 +28,7 @@ impl MattermostClient {
     /// # API Endpoint
     /// GET /teams/{team_id}
     pub async fn get_team(&self, team_id: &str) -> Result<MattermostTeam> {
-        let endpoint = format!("/teams/{}", team_id);
+        let endpoint = format!("/teams/{team_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -44,7 +44,7 @@ impl MattermostClient {
     /// # API Endpoint
     /// GET /teams/name/{team_name}
     pub async fn get_team_by_name(&self, team_name: &str) -> Result<MattermostTeam> {
-        let endpoint = format!("/teams/name/{}", team_name);
+        let endpoint = format!("/teams/name/{team_name}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }

@@ -35,7 +35,7 @@ impl MattermostClient {
             .map_err(|e| {
                 Error::new(
                     ErrorCode::AuthenticationFailed,
-                    &format!("Login request failed: {}", e),
+                    format!("Login request failed: {e}"),
                 )
             })?;
 
@@ -51,7 +51,7 @@ impl MattermostClient {
                 .map_err(|e| {
                     Error::new(
                         ErrorCode::AuthenticationFailed,
-                        &format!("Invalid token header: {}", e),
+                        format!("Invalid token header: {e}"),
                     )
                 })?
                 .to_string();
@@ -69,7 +69,7 @@ impl MattermostClient {
         let status = response.status();
         if status.is_success() {
             let user = response.json::<MattermostUser>().await.map_err(|e| {
-                Error::new(ErrorCode::Unknown, &format!("Failed to parse user: {}", e))
+                Error::new(ErrorCode::Unknown, format!("Failed to parse user: {e}"))
             })?;
 
             // Store the user ID
@@ -86,7 +86,7 @@ impl MattermostClient {
 
             Err(Error::new(
                 ErrorCode::AuthenticationFailed,
-                &format!("Login failed with status {}: {}", status, error_text),
+                format!("Login failed with status {status}: {error_text}"),
             ))
         }
     }
@@ -119,7 +119,7 @@ impl MattermostClient {
                 self.set_token(String::new()).await;
                 Err(Error::new(
                     ErrorCode::AuthenticationFailed,
-                    &format!("Token authentication failed: {}", e),
+                    format!("Token authentication failed: {e}"),
                 ))
             }
         }
@@ -149,7 +149,7 @@ impl MattermostClient {
             // Check if the logout call was successful
             if let Err(e) = response {
                 // Log the error but don't fail - we've already cleared local state
-                eprintln!("Logout API call failed (local state cleared): {}", e);
+                eprintln!("Logout API call failed (local state cleared): {e}");
             }
         } else {
             self.set_state(ConnectionState::Disconnected).await;

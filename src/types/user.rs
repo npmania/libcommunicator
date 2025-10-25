@@ -29,6 +29,7 @@ pub struct User {
 /// User status/presence
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum UserStatus {
     /// User is online and active
     Online,
@@ -39,6 +40,7 @@ pub enum UserStatus {
     /// User is offline
     Offline,
     /// Status is unknown
+    #[default]
     Unknown,
 }
 
@@ -99,11 +101,6 @@ impl User {
     }
 }
 
-impl Default for UserStatus {
-    fn default() -> Self {
-        UserStatus::Unknown
-    }
-}
 
 #[cfg(test)]
 mod tests {

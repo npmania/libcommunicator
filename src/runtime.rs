@@ -28,7 +28,7 @@ pub fn init_runtime() -> crate::error::Result<()> {
         let runtime = Runtime::new().map_err(|e| {
             crate::error::Error::new(
                 crate::error::ErrorCode::Unknown,
-                format!("Failed to create Tokio runtime: {}", e),
+                format!("Failed to create Tokio runtime: {e}"),
             )
         })?;
         *runtime_guard = Some(runtime);
