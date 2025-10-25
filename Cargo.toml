@@ -8,3 +8,4 @@ name = "communicator"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+lazy_static = "1.4"
