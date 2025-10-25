@@ -38,6 +38,16 @@ pub struct WebSocketConfig {
     /// Ping interval in seconds (default: 30)
     /// Sends ping to keep connection alive
     pub ping_interval_secs: u64,
+    /// Enable automatic reconnection on disconnect (default: true)
+    pub enable_auto_reconnect: bool,
+    /// Maximum number of reconnection attempts (default: None = unlimited)
+    pub max_reconnect_attempts: Option<u32>,
+    /// Initial reconnection delay in milliseconds (default: 1000)
+    pub initial_reconnect_delay_ms: u64,
+    /// Maximum reconnection delay in milliseconds (default: 60000)
+    pub max_reconnect_delay_ms: u64,
+    /// Backoff multiplier for exponential backoff (default: 2.0)
+    pub reconnect_backoff_multiplier: f64,
 }
 
 impl Default for WebSocketConfig {
@@ -45,6 +55,11 @@ impl Default for WebSocketConfig {
         Self {
             max_queue_size: 1000,
             ping_interval_secs: 30,
+            enable_auto_reconnect: true,
+            max_reconnect_attempts: None, // Unlimited retries
+            initial_reconnect_delay_ms: 1000,
+            max_reconnect_delay_ms: 60000,
+            reconnect_backoff_multiplier: 2.0,
         }
     }
 }
@@ -71,6 +86,8 @@ pub struct WebSocketManager {
     last_received_seq: Arc<Mutex<i64>>,
     /// Current connection state
     connection_state: Arc<Mutex<ConnectionState>>,
+    /// Current number of reconnection attempts
+    reconnect_attempts: Arc<Mutex<u32>>,
 }
 
 impl WebSocketManager {
@@ -110,6 +127,7 @@ impl WebSocketManager {
             seq_number: Arc::new(Mutex::new(1)),
             last_received_seq: Arc::new(Mutex::new(0)),
             connection_state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
+            reconnect_attempts: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -139,6 +157,37 @@ impl WebSocketManager {
     /// Set the connection state
     async fn set_connection_state(&self, state: ConnectionState) {
         *self.connection_state.lock().await = state;
+    }
+
+    /// Calculate exponential backoff delay in milliseconds
+    ///
+    /// # Arguments
+    /// * `attempt` - Current reconnection attempt number (0-based)
+    ///
+    /// # Returns
+    /// Delay in milliseconds, capped at max_reconnect_delay_ms
+    fn calculate_backoff_delay(&self, attempt: u32) -> u64 {
+        let initial = self.config.initial_reconnect_delay_ms as f64;
+        let multiplier = self.config.reconnect_backoff_multiplier;
+        let max = self.config.max_reconnect_delay_ms;
+
+        // Calculate: initial_delay * (multiplier ^ attempt)
+        let delay = initial * multiplier.powi(attempt as i32);
+
+        // Cap at maximum delay
+        delay.min(max as f64) as u64
+    }
+
+    /// Reset reconnection attempt counter
+    async fn reset_reconnect_attempts(&self) {
+        *self.reconnect_attempts.lock().await = 0;
+    }
+
+    /// Increment and get reconnection attempt counter
+    async fn increment_reconnect_attempts(&self) -> u32 {
+        let mut attempts = self.reconnect_attempts.lock().await;
+        *attempts += 1;
+        *attempts
     }
 
     /// Send a WebSocket message
@@ -218,8 +267,11 @@ impl WebSocketManager {
         // Mark as connected after successful authentication
         self.set_connection_state(ConnectionState::Connected).await;
 
+        // Reset reconnection counter on successful connection
+        self.reset_reconnect_attempts().await;
+
         // Create shutdown channel
-        let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
 
         // Clone references for the spawned task
@@ -227,13 +279,21 @@ impl WebSocketManager {
         let connection_state = Arc::clone(&self.connection_state);
         let ws_writer = Arc::clone(&self.ws_writer);
         let last_received_seq = Arc::clone(&self.last_received_seq);
+        let reconnect_attempts = Arc::clone(&self.reconnect_attempts);
         let ping_interval = std::time::Duration::from_secs(self.config.ping_interval_secs);
 
-        // Spawn a task to handle incoming messages
+        // Clone config and connection info for reconnection
+        let config = self.config.clone();
+        let ws_url = self.ws_url.clone();
+        let token = self.token.clone();
+        let seq_number = Arc::clone(&self.seq_number);
+
+        // Spawn a task to handle incoming messages with automatic reconnection
         tokio::spawn(async move {
             let mut read = read;  // Make read mutable for the task
             let mut ping_timer = tokio::time::interval(ping_interval);
             ping_timer.tick().await;  // Skip first immediate tick
+            let mut current_shutdown_rx = shutdown_rx;
 
             loop {
                 tokio::select! {
@@ -292,7 +352,7 @@ impl WebSocketManager {
                         }
                     }
                     // Handle shutdown signal
-                    _ = shutdown_rx.recv() => {
+                    _ = current_shutdown_rx.recv() => {
                         println!("WebSocket shutdown requested");
                         *connection_state.lock().await = ConnectionState::ShuttingDown;
                         *ws_writer.lock().await = None;
@@ -301,7 +361,153 @@ impl WebSocketManager {
                 }
             }
 
-            // Ensure we're marked as disconnected and writer is cleared when task exits
+            // After disconnect, check if we should attempt reconnection
+            let current_state = *connection_state.lock().await;
+
+            // Only attempt reconnection if not shutting down and auto-reconnect is enabled
+            if current_state != ConnectionState::ShuttingDown && config.enable_auto_reconnect {
+                // Reconnection loop with exponential backoff
+                loop {
+                    // Get current attempt count
+                    let mut attempts = reconnect_attempts.lock().await;
+                    let attempt_num = *attempts;
+
+                    // Check if we've exceeded max attempts
+                    if let Some(max_attempts) = config.max_reconnect_attempts {
+                        if attempt_num >= max_attempts {
+                            eprintln!("Max reconnection attempts ({}) reached, giving up", max_attempts);
+                            *connection_state.lock().await = ConnectionState::Disconnected;
+                            break;
+                        }
+                    }
+
+                    *attempts += 1;
+                    drop(attempts); // Release lock before sleeping
+
+                    // Set state to Reconnecting
+                    *connection_state.lock().await = ConnectionState::Reconnecting;
+
+                    // Calculate backoff delay
+                    let initial = config.initial_reconnect_delay_ms as f64;
+                    let multiplier = config.reconnect_backoff_multiplier;
+                    let max_delay = config.max_reconnect_delay_ms;
+                    let delay = (initial * multiplier.powi(attempt_num as i32)).min(max_delay as f64) as u64;
+
+                    println!("WebSocket disconnected. Attempting reconnection {} in {} ms...", attempt_num + 1, delay);
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+
+                    // Attempt to reconnect
+                    match connect_async(&ws_url).await {
+                        Ok((ws_stream, _)) => {
+                            println!("WebSocket reconnected successfully");
+
+                            let (mut write, new_read) = ws_stream.split();
+
+                            // Send authentication challenge
+                            let seq = {
+                                let mut seq_num = seq_number.lock().await;
+                                let current = *seq_num;
+                                *seq_num += 1;
+                                current
+                            };
+
+                            let auth_challenge = WebSocketAuthChallenge {
+                                seq,
+                                action: "authentication_challenge".to_string(),
+                                data: WebSocketAuthData {
+                                    token: token.clone(),
+                                },
+                            };
+
+                            if let Ok(auth_msg) = serde_json::to_string(&auth_challenge) {
+                                if write.send(Message::Text(auth_msg)).await.is_ok() {
+                                    // Successfully reconnected and authenticated
+                                    *ws_writer.lock().await = Some(write);
+                                    *connection_state.lock().await = ConnectionState::Connected;
+                                    *reconnect_attempts.lock().await = 0; // Reset counter
+
+                                    // Continue with the new read stream
+                                    read = new_read;
+                                    ping_timer = tokio::time::interval(ping_interval);
+                                    ping_timer.tick().await; // Skip first tick
+
+                                    // Reconnection successful, return to message loop
+                                    'message_loop: loop {
+                                        tokio::select! {
+                                            msg = read.next() => {
+                                                match msg {
+                                                    Some(Ok(Message::Text(text))) => {
+                                                        if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
+                                                            eprintln!("Error handling WebSocket message: {}", e);
+                                                        }
+                                                    }
+                                                    Some(Ok(Message::Ping(data))) => {
+                                                        if let Some(writer) = ws_writer.lock().await.as_mut() {
+                                                            if let Err(e) = writer.send(Message::Pong(data)).await {
+                                                                eprintln!("Failed to send pong: {}", e);
+                                                                *connection_state.lock().await = ConnectionState::Disconnected;
+                                                                *ws_writer.lock().await = None;
+                                                                break 'message_loop;
+                                                            }
+                                                        }
+                                                    }
+                                                    Some(Ok(Message::Pong(_))) => {}
+                                                    Some(Ok(Message::Close(_))) => {
+                                                        println!("WebSocket closed by server");
+                                                        *connection_state.lock().await = ConnectionState::Disconnected;
+                                                        *ws_writer.lock().await = None;
+                                                        break 'message_loop;
+                                                    }
+                                                    Some(Err(e)) => {
+                                                        eprintln!("WebSocket error: {}", e);
+                                                        *connection_state.lock().await = ConnectionState::Disconnected;
+                                                        *ws_writer.lock().await = None;
+                                                        break 'message_loop;
+                                                    }
+                                                    None => {
+                                                        println!("WebSocket stream ended");
+                                                        *connection_state.lock().await = ConnectionState::Disconnected;
+                                                        *ws_writer.lock().await = None;
+                                                        break 'message_loop;
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                            _ = ping_timer.tick() => {
+                                                if let Some(writer) = ws_writer.lock().await.as_mut() {
+                                                    if let Err(e) = writer.send(Message::Ping(vec![])).await {
+                                                        eprintln!("Failed to send ping: {}", e);
+                                                        *connection_state.lock().await = ConnectionState::Disconnected;
+                                                        *ws_writer.lock().await = None;
+                                                        break 'message_loop;
+                                                    }
+                                                }
+                                            }
+                                            _ = current_shutdown_rx.recv() => {
+                                                println!("WebSocket shutdown requested");
+                                                *connection_state.lock().await = ConnectionState::ShuttingDown;
+                                                *ws_writer.lock().await = None;
+                                                return; // Exit completely
+                                            }
+                                        }
+                                    }
+                                    // If we break from the inner loop, continue the reconnection loop
+                                } else {
+                                    eprintln!("Failed to authenticate after reconnection");
+                                }
+                            } else {
+                                eprintln!("Failed to serialize auth message");
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Reconnection attempt {} failed: {}", attempt_num + 1, e);
+                            // Continue to next reconnection attempt
+                        }
+                    }
+                }
+            }
+
+            // Final cleanup - ensure we're marked as disconnected
             *connection_state.lock().await = ConnectionState::Disconnected;
             *ws_writer.lock().await = None;
         });
@@ -608,6 +814,11 @@ mod tests {
         let config = WebSocketConfig {
             max_queue_size: 2,
             ping_interval_secs: 30,
+            enable_auto_reconnect: true,
+            max_reconnect_attempts: None,
+            initial_reconnect_delay_ms: 1000,
+            max_reconnect_delay_ms: 60000,
+            reconnect_backoff_multiplier: 2.0,
         };
         let manager = WebSocketManager::with_config(
             "https://mattermost.example.com",
@@ -705,5 +916,102 @@ mod tests {
 
         // State should change to Connecting when connect is called (will fail, but state changes)
         // Note: This test would need a mock server for full testing
+    }
+
+    #[test]
+    fn test_reconnection_config_defaults() {
+        let config = WebSocketConfig::default();
+
+        assert_eq!(config.enable_auto_reconnect, true);
+        assert_eq!(config.max_reconnect_attempts, None);
+        assert_eq!(config.initial_reconnect_delay_ms, 1000);
+        assert_eq!(config.max_reconnect_delay_ms, 60000);
+        assert_eq!(config.reconnect_backoff_multiplier, 2.0);
+    }
+
+    #[test]
+    fn test_reconnection_config_custom() {
+        let config = WebSocketConfig {
+            max_queue_size: 100,
+            ping_interval_secs: 15,
+            enable_auto_reconnect: false,
+            max_reconnect_attempts: Some(5),
+            initial_reconnect_delay_ms: 500,
+            max_reconnect_delay_ms: 30000,
+            reconnect_backoff_multiplier: 1.5,
+        };
+
+        assert_eq!(config.enable_auto_reconnect, false);
+        assert_eq!(config.max_reconnect_attempts, Some(5));
+        assert_eq!(config.initial_reconnect_delay_ms, 500);
+        assert_eq!(config.max_reconnect_delay_ms, 30000);
+        assert_eq!(config.reconnect_backoff_multiplier, 1.5);
+    }
+
+    #[test]
+    fn test_backoff_delay_calculation() {
+        let config = WebSocketConfig::default();
+        let manager = WebSocketManager::with_config(
+            "https://mattermost.example.com",
+            "token".to_string(),
+            config,
+        );
+
+        // Test exponential backoff: delay = initial * (multiplier ^ attempt)
+        assert_eq!(manager.calculate_backoff_delay(0), 1000);   // 1000 * 2^0 = 1000ms
+        assert_eq!(manager.calculate_backoff_delay(1), 2000);   // 1000 * 2^1 = 2000ms
+        assert_eq!(manager.calculate_backoff_delay(2), 4000);   // 1000 * 2^2 = 4000ms
+        assert_eq!(manager.calculate_backoff_delay(3), 8000);   // 1000 * 2^3 = 8000ms
+        assert_eq!(manager.calculate_backoff_delay(4), 16000);  // 1000 * 2^4 = 16000ms
+        assert_eq!(manager.calculate_backoff_delay(5), 32000);  // 1000 * 2^5 = 32000ms
+        assert_eq!(manager.calculate_backoff_delay(6), 60000);  // Capped at max (60000ms)
+        assert_eq!(manager.calculate_backoff_delay(10), 60000); // Still capped
+    }
+
+    #[test]
+    fn test_backoff_delay_custom_multiplier() {
+        let config = WebSocketConfig {
+            max_queue_size: 1000,
+            ping_interval_secs: 30,
+            enable_auto_reconnect: true,
+            max_reconnect_attempts: None,
+            initial_reconnect_delay_ms: 500,
+            max_reconnect_delay_ms: 10000,
+            reconnect_backoff_multiplier: 1.5,
+        };
+        let manager = WebSocketManager::with_config(
+            "https://mattermost.example.com",
+            "token".to_string(),
+            config,
+        );
+
+        // Test with multiplier 1.5
+        assert_eq!(manager.calculate_backoff_delay(0), 500);   // 500 * 1.5^0 = 500ms
+        assert_eq!(manager.calculate_backoff_delay(1), 750);   // 500 * 1.5^1 = 750ms
+        assert_eq!(manager.calculate_backoff_delay(2), 1125);  // 500 * 1.5^2 = 1125ms
+        assert_eq!(manager.calculate_backoff_delay(3), 1687);  // 500 * 1.5^3 = 1687ms
+        assert_eq!(manager.calculate_backoff_delay(10), 10000); // Capped at max
+    }
+
+    #[tokio::test]
+    async fn test_reconnect_attempts_counter() {
+        let manager = WebSocketManager::new("https://mattermost.example.com", "token".to_string());
+
+        // Should start at 0
+        assert_eq!(*manager.reconnect_attempts.lock().await, 0);
+
+        // Increment
+        let count1 = manager.increment_reconnect_attempts().await;
+        assert_eq!(count1, 1);
+        assert_eq!(*manager.reconnect_attempts.lock().await, 1);
+
+        // Increment again
+        let count2 = manager.increment_reconnect_attempts().await;
+        assert_eq!(count2, 2);
+        assert_eq!(*manager.reconnect_attempts.lock().await, 2);
+
+        // Reset
+        manager.reset_reconnect_attempts().await;
+        assert_eq!(*manager.reconnect_attempts.lock().await, 0);
     }
 }
