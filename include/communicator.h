@@ -706,6 +706,18 @@ char* communicator_platform_get_team_by_name(
     const char* team_name
 );
 
+/**
+ * Set the active team/workspace ID
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID to set as active (pass NULL to unset)
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_set_team_id(
+    CommunicatorPlatform platform,
+    const char* team_id
+);
+
 // ============================================================================
 // User Status Management
 // ============================================================================

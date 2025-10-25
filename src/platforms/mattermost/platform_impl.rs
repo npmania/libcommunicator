@@ -401,6 +401,11 @@ impl Platform for MattermostPlatform {
         let mm_team = self.client.get_team_by_name(team_name).await?;
         Ok(mm_team.into())
     }
+
+    async fn set_team_id(&self, team_id: Option<String>) -> Result<()> {
+        self.client.set_team_id(team_id).await;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

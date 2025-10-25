@@ -2456,6 +2456,49 @@ pub extern "C" fn communicator_platform_get_team_by_name(
     }
 }
 
+/// FFI function: Set the active team/workspace ID
+/// team_id: The team ID to set as active (pass NULL to unset)
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_set_team_id(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    // team_id can be NULL (to unset the team ID)
+    let team_id_opt = if team_id.is_null() {
+        None
+    } else {
+        let team_id_str = unsafe {
+            match std::ffi::CStr::from_ptr(team_id).to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    error::set_last_error(Error::invalid_utf8());
+                    return ErrorCode::InvalidUtf8;
+                }
+            }
+        };
+        Some(team_id_str.to_string())
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.set_team_id(team_id_opt)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
 /// FFI function: Destroy a platform and free its memory
 /// After calling this, the handle is invalid and must not be used
 #[no_mangle]

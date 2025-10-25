@@ -865,6 +865,30 @@ func (p *Platform) GetTeamByName(teamName string) (*Team, error) {
 	return &team, nil
 }
 
+// SetTeamID sets the active team/workspace ID
+// Pass an empty string or nil pointer to unset the team ID
+func (p *Platform) SetTeamID(teamID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	var cs *C.char
+	var free func()
+	if teamID == "" {
+		cs = nil
+	} else {
+		cs, free = cStringFree(teamID)
+		defer free()
+	}
+
+	code := C.communicator_platform_set_team_id(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
 // Destroy destroys the platform and frees its resources
 func (p *Platform) Destroy() {
 	if p.handle != nil {

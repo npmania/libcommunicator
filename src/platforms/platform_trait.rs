@@ -459,6 +459,19 @@ pub trait Platform: Send + Sync {
         let _ = team_name;
         Err(crate::error::Error::unsupported("Team lookup by name not supported by this platform"))
     }
+
+    /// Set the active team/workspace ID
+    ///
+    /// # Arguments
+    /// * `team_id` - The team ID to set as active (or None to unset)
+    ///
+    /// # Notes
+    /// Only applicable for platforms with workspaces. Check `capabilities().has_workspaces` first.
+    /// This affects operations that are team-scoped, such as getting channels or searching messages.
+    async fn set_team_id(&self, team_id: Option<String>) -> Result<()> {
+        let _ = team_id;
+        Err(crate::error::Error::unsupported("Setting team ID not supported by this platform"))
+    }
 }
 
 #[cfg(test)]
