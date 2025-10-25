@@ -8,6 +8,21 @@ use crate::platforms::platform_trait::PlatformEvent;
 
 use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, WebSocketAuthData, WebSocketEvent};
 
+/// WebSocket connection state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionState {
+    /// Not connected
+    Disconnected,
+    /// Attempting to connect
+    Connecting,
+    /// Successfully connected and authenticated
+    Connected,
+    /// Attempting to reconnect after disconnection
+    Reconnecting,
+    /// Shutting down gracefully
+    ShuttingDown,
+}
+
 /// WebSocket connection manager for Mattermost
 pub struct WebSocketManager {
     /// URL for the WebSocket connection
@@ -20,6 +35,8 @@ pub struct WebSocketManager {
     shutdown_tx: Option<mpsc::Sender<()>>,
     /// Sequence number for WebSocket messages
     seq_number: Arc<Mutex<i64>>,
+    /// Current connection state
+    connection_state: Arc<Mutex<ConnectionState>>,
 }
 
 impl WebSocketManager {
@@ -41,7 +58,18 @@ impl WebSocketManager {
             event_queue: Arc::new(Mutex::new(Vec::new())),
             shutdown_tx: None,
             seq_number: Arc::new(Mutex::new(1)),
+            connection_state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
         }
+    }
+
+    /// Get the current connection state
+    pub async fn get_connection_state(&self) -> ConnectionState {
+        *self.connection_state.lock().await
+    }
+
+    /// Set the connection state
+    async fn set_connection_state(&self, state: ConnectionState) {
+        *self.connection_state.lock().await = state;
     }
 
     /// Connect to the Mattermost WebSocket and start receiving events
@@ -49,9 +77,18 @@ impl WebSocketManager {
     /// # Returns
     /// A Result indicating success or failure
     pub async fn connect(&mut self) -> Result<()> {
+        self.set_connection_state(ConnectionState::Connecting).await;
+
         let (ws_stream, _) = connect_async(&self.ws_url)
             .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("WebSocket connection failed: {}", e)))?;
+            .map_err(|e| {
+                // Set state back to disconnected on failure
+                let state = self.connection_state.clone();
+                tokio::spawn(async move {
+                    *state.lock().await = ConnectionState::Disconnected;
+                });
+                Error::new(ErrorCode::NetworkError, &format!("WebSocket connection failed: {}", e))
+            })?;
 
         let (mut write, mut read) = ws_stream.split();
 
@@ -79,12 +116,16 @@ impl WebSocketManager {
             .await
             .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to send auth: {}", e)))?;
 
+        // Mark as connected after successful authentication
+        self.set_connection_state(ConnectionState::Connected).await;
+
         // Create shutdown channel
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
 
         // Clone Arc references for the spawned task
         let event_queue = Arc::clone(&self.event_queue);
+        let connection_state = Arc::clone(&self.connection_state);
 
         // Spawn a task to handle incoming messages
         tokio::spawn(async move {
@@ -100,14 +141,17 @@ impl WebSocketManager {
                             }
                             Some(Ok(Message::Close(_))) => {
                                 println!("WebSocket closed by server");
+                                *connection_state.lock().await = ConnectionState::Disconnected;
                                 break;
                             }
                             Some(Err(e)) => {
                                 eprintln!("WebSocket error: {}", e);
+                                *connection_state.lock().await = ConnectionState::Disconnected;
                                 break;
                             }
                             None => {
                                 println!("WebSocket stream ended");
+                                *connection_state.lock().await = ConnectionState::Disconnected;
                                 break;
                             }
                             _ => {}
@@ -116,10 +160,14 @@ impl WebSocketManager {
                     // Handle shutdown signal
                     _ = shutdown_rx.recv() => {
                         println!("WebSocket shutdown requested");
+                        *connection_state.lock().await = ConnectionState::ShuttingDown;
                         break;
                     }
                 }
             }
+
+            // Ensure we're marked as disconnected when task exits
+            *connection_state.lock().await = ConnectionState::Disconnected;
         });
 
         Ok(())
@@ -308,9 +356,11 @@ impl WebSocketManager {
 
     /// Disconnect from the WebSocket
     pub async fn disconnect(&mut self) {
+        self.set_connection_state(ConnectionState::ShuttingDown).await;
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(()).await;
         }
+        // State will be set to Disconnected by the spawned task
     }
 
 }
@@ -413,5 +463,16 @@ mod tests {
         } else {
             panic!("Expected MessageDeleted event");
         }
+    }
+
+    #[tokio::test]
+    async fn test_connection_state() {
+        let manager = WebSocketManager::new("https://mattermost.example.com", "token".to_string());
+
+        // Should start in Disconnected state
+        assert_eq!(manager.get_connection_state().await, ConnectionState::Disconnected);
+
+        // State should change to Connecting when connect is called (will fail, but state changes)
+        // Note: This test would need a mock server for full testing
     }
 }
