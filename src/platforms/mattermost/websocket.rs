@@ -287,17 +287,6 @@ impl WebSocketManager {
         }
     }
 
-    /// Check if there are any events in the queue
-    pub async fn has_events(&self) -> bool {
-        let queue = self.event_queue.lock().await;
-        !queue.is_empty()
-    }
-
-    /// Get the number of events in the queue
-    pub async fn event_count(&self) -> usize {
-        let queue = self.event_queue.lock().await;
-        queue.len()
-    }
 }
 
 impl Drop for WebSocketManager {

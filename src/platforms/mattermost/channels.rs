@@ -1,5 +1,4 @@
 use crate::error::Result;
-use crate::types::ChannelType;
 
 use super::client::MattermostClient;
 use super::types::{ChannelMember, CreateDirectChannelRequest, CreateGroupChannelRequest, MattermostChannel};
@@ -41,31 +40,6 @@ pub fn get_dm_partner_id(channel_id: &str, current_user_id: &str) -> Option<Stri
         }
     }
     None
-}
-
-/// Detect channel type from ID format
-///
-/// Direct message channels have the format `user_id__user_id` (2 parts)
-/// Group message channels have more than 2 parts separated by `__`
-///
-/// # Arguments
-/// * `channel_id` - The channel ID to analyze
-///
-/// # Returns
-/// The detected channel type, or None if the type cannot be determined from the ID
-pub fn detect_channel_type_from_id(channel_id: &str) -> Option<ChannelType> {
-    if channel_id.contains("__") {
-        let parts: Vec<&str> = channel_id.split("__").collect();
-        if parts.len() == 2 {
-            Some(ChannelType::DirectMessage)
-        } else if parts.len() > 2 {
-            Some(ChannelType::GroupMessage)
-        } else {
-            None
-        }
-    } else {
-        None // Use API-provided type
-    }
 }
 
 impl MattermostClient {

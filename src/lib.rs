@@ -420,7 +420,6 @@ pub extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> P
             Box::into_raw(Box::new(boxed))
         }
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -639,7 +638,6 @@ pub extern "C" fn communicator_platform_send_message(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -682,7 +680,6 @@ pub extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> 
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -738,7 +735,6 @@ pub extern "C" fn communicator_platform_get_channel(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -795,7 +791,6 @@ pub extern "C" fn communicator_platform_get_messages(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -851,7 +846,6 @@ pub extern "C" fn communicator_platform_get_channel_members(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -907,7 +901,6 @@ pub extern "C" fn communicator_platform_get_user(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -950,7 +943,6 @@ pub extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle)
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -1006,7 +998,6 @@ pub extern "C" fn communicator_platform_create_direct_channel(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -1049,7 +1040,6 @@ pub extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mu
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -1105,7 +1095,6 @@ pub extern "C" fn communicator_platform_get_team(
             }
         },
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -1229,7 +1218,6 @@ pub extern "C" fn communicator_platform_get_user_status(
             }
         }
         Err(e) => {
-            let _code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
@@ -1400,7 +1388,6 @@ pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *m
             std::ptr::null_mut()
         }
         Err(e) => {
-            let code = e.code;
             error::set_last_error(e);
             std::ptr::null_mut()
         }
