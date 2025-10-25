@@ -63,22 +63,24 @@ type Team struct {
 
 // Attachment represents a file attachment
 type Attachment struct {
-	ID       string `json:"id"`
-	Filename string `json:"filename"`
-	MimeType string `json:"mime_type,omitempty"`
-	Size     int64  `json:"size,omitempty"`
-	URL      string `json:"url,omitempty"`
+	ID           string  `json:"id"`
+	Filename     string  `json:"filename"`
+	MimeType     string  `json:"mime_type"`
+	Size         uint64  `json:"size"`
+	URL          string  `json:"url"`
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"` // Added to match Rust
 }
 
 // Message represents a chat message
 type Message struct {
 	ID          string       `json:"id"`
 	ChannelID   string       `json:"channel_id"`
-	UserID      string       `json:"user_id"`
+	SenderID    string       `json:"sender_id"` // Changed from UserID to match Rust
 	Text        string       `json:"text"`
 	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at,omitempty"`
+	EditedAt    *time.Time   `json:"edited_at,omitempty"` // Changed from UpdatedAt to match Rust
 	Attachments []Attachment `json:"attachments,omitempty"`
+	Metadata    interface{}  `json:"metadata,omitempty"` // Added to match Rust
 }
 
 // ConnectionInfo represents connection information

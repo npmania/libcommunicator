@@ -101,16 +101,16 @@ func main() {
 	router.OnMessagePosted(func(event *comm.Event) {
 		// Parse the message from event data
 		if data, ok := event.Data.(map[string]interface{}); ok {
-			userID, _ := data["user_id"].(string)
+			senderID, _ := data["sender_id"].(string) // Changed from user_id to sender_id
 			channelID, _ := data["channel_id"].(string)
 			text, _ := data["text"].(string)
 
 			// Ignore messages from the bot itself
-			if userID == currentUser.ID {
+			if senderID == currentUser.ID {
 				return
 			}
 
-			fmt.Printf("[MESSAGE] Channel: %s, User: %s, Text: %s\n", channelID, userID, text)
+			fmt.Printf("[MESSAGE] Channel: %s, User: %s, Text: %s\n", channelID, senderID, text)
 
 			// Simple echo bot: respond to messages that start with "!echo"
 			if strings.HasPrefix(text, "!echo ") {

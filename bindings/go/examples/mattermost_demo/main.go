@@ -127,7 +127,7 @@ func main() {
 			} else {
 				fmt.Printf("   Retrieved %d messages\n", len(messages))
 				for i, msg := range messages {
-					fmt.Printf("   [%d] %s: %s\n", i+1, msg.UserID, msg.Text)
+					fmt.Printf("   [%d] %s: %s\n", i+1, msg.SenderID, msg.Text)
 				}
 				fmt.Println()
 			}
