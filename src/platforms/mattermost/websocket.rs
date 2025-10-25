@@ -1,12 +1,18 @@
-use futures::{SinkExt, StreamExt};
+use futures::{stream::{SplitSink, SplitStream}, SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::PlatformEvent;
 
 use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, WebSocketAuthData, WebSocketEvent};
+
+/// Type alias for the WebSocket write half
+type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+/// Type alias for the WebSocket read half
+type WsReader = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 /// WebSocket connection state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +57,8 @@ pub struct WebSocketManager {
     event_tx: mpsc::Sender<PlatformEvent>,
     /// Event receiver for polling events
     event_rx: Arc<Mutex<mpsc::Receiver<PlatformEvent>>>,
+    /// WebSocket write half for sending messages
+    ws_writer: Arc<Mutex<Option<WsWriter>>>,
     /// Shutdown signal sender
     shutdown_tx: Option<mpsc::Sender<()>>,
     /// Sequence number for WebSocket messages
@@ -91,6 +99,7 @@ impl WebSocketManager {
             config,
             event_tx,
             event_rx: Arc::new(Mutex::new(event_rx)),
+            ws_writer: Arc::new(Mutex::new(None)),
             shutdown_tx: None,
             seq_number: Arc::new(Mutex::new(1)),
             connection_state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
@@ -105,6 +114,33 @@ impl WebSocketManager {
     /// Set the connection state
     async fn set_connection_state(&self, state: ConnectionState) {
         *self.connection_state.lock().await = state;
+    }
+
+    /// Send a WebSocket message
+    ///
+    /// # Arguments
+    /// * `message` - The message to send
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    async fn send_ws_message(&self, message: Message) -> Result<()> {
+        let mut writer = self.ws_writer.lock().await;
+        if let Some(ws) = writer.as_mut() {
+            ws.send(message)
+                .await
+                .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to send WebSocket message: {}", e)))?;
+            Ok(())
+        } else {
+            Err(Error::new(ErrorCode::InvalidState, "WebSocket not connected"))
+        }
+    }
+
+    /// Get next sequence number for WebSocket messages
+    async fn next_seq(&self) -> i64 {
+        let mut seq_num = self.seq_number.lock().await;
+        let current = *seq_num;
+        *seq_num += 1;
+        current
     }
 
     /// Connect to the Mattermost WebSocket and start receiving events
@@ -125,7 +161,7 @@ impl WebSocketManager {
                 Error::new(ErrorCode::NetworkError, &format!("WebSocket connection failed: {}", e))
             })?;
 
-        let (mut write, mut read) = ws_stream.split();
+        let (mut write, read) = ws_stream.split();
 
         // Send authentication challenge
         let seq = {
@@ -151,6 +187,9 @@ impl WebSocketManager {
             .await
             .map_err(|e| Error::new(ErrorCode::NetworkError, &format!("Failed to send auth: {}", e)))?;
 
+        // Store the write half for bidirectional communication
+        *self.ws_writer.lock().await = Some(write);
+
         // Mark as connected after successful authentication
         self.set_connection_state(ConnectionState::Connected).await;
 
@@ -161,9 +200,12 @@ impl WebSocketManager {
         // Clone references for the spawned task
         let event_tx = self.event_tx.clone();
         let connection_state = Arc::clone(&self.connection_state);
+        let ws_writer = Arc::clone(&self.ws_writer);
 
         // Spawn a task to handle incoming messages
         tokio::spawn(async move {
+            let mut read = read;  // Make read mutable for the task
+
             loop {
                 tokio::select! {
                     // Handle incoming WebSocket messages
@@ -177,16 +219,19 @@ impl WebSocketManager {
                             Some(Ok(Message::Close(_))) => {
                                 println!("WebSocket closed by server");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
+                                *ws_writer.lock().await = None;
                                 break;
                             }
                             Some(Err(e)) => {
                                 eprintln!("WebSocket error: {}", e);
                                 *connection_state.lock().await = ConnectionState::Disconnected;
+                                *ws_writer.lock().await = None;
                                 break;
                             }
                             None => {
                                 println!("WebSocket stream ended");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
+                                *ws_writer.lock().await = None;
                                 break;
                             }
                             _ => {}
@@ -196,13 +241,15 @@ impl WebSocketManager {
                     _ = shutdown_rx.recv() => {
                         println!("WebSocket shutdown requested");
                         *connection_state.lock().await = ConnectionState::ShuttingDown;
+                        *ws_writer.lock().await = None;
                         break;
                     }
                 }
             }
 
-            // Ensure we're marked as disconnected when task exits
+            // Ensure we're marked as disconnected and writer is cleared when task exits
             *connection_state.lock().await = ConnectionState::Disconnected;
+            *ws_writer.lock().await = None;
         });
 
         Ok(())
