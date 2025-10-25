@@ -1,7 +1,7 @@
 //! Platform trait defining the interface all platform adapters must implement
 
 use crate::error::Result;
-use crate::types::{Channel, ConnectionInfo, Message, Team, User};
+use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 use crate::types::user::UserStatus;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -13,7 +13,9 @@ pub struct PlatformConfig {
     pub server: String,
     /// Authentication credentials (e.g., token, username/password)
     pub credentials: HashMap<String, String>,
-    /// Optional team/workspace identifier
+    /// Optional team/workspace/guild identifier
+    /// Only applicable for platforms that support organizational hierarchies
+    /// (check PlatformCapabilities.has_workspaces)
     pub team_id: Option<String>,
     /// Additional platform-specific configuration
     pub extra: HashMap<String, String>,
@@ -80,8 +82,17 @@ pub enum PlatformEvent {
 ///
 /// This defines the common interface for interacting with different chat platforms
 /// (Mattermost, Slack, Discord, etc.)
+///
+/// Not all methods are supported by all platforms. Use `capabilities()` to check
+/// what features are available before calling optional methods.
 #[async_trait]
 pub trait Platform: Send + Sync {
+    /// Get the capabilities of this platform
+    ///
+    /// Returns information about what features this platform supports.
+    /// Consumers should check capabilities before calling optional methods.
+    fn capabilities(&self) -> &PlatformCapabilities;
+
     /// Connect to the platform and authenticate
     ///
     /// # Arguments
@@ -154,6 +165,10 @@ pub trait Platform: Send + Sync {
     ///
     /// # Returns
     /// List of teams
+    ///
+    /// # Errors
+    /// Returns `ErrorCode::Unsupported` if the platform doesn't support teams/workspaces.
+    /// Check `capabilities().has_workspaces` before calling.
     async fn get_teams(&self) -> Result<Vec<Team>>;
 
     /// Get details about a specific team
@@ -163,16 +178,25 @@ pub trait Platform: Send + Sync {
     ///
     /// # Returns
     /// The team details
+    ///
+    /// # Errors
+    /// Returns `ErrorCode::Unsupported` if the platform doesn't support teams/workspaces.
+    /// Check `capabilities().has_workspaces` before calling.
     async fn get_team(&self, team_id: &str) -> Result<Team>;
 
     /// Set the current user's status
     ///
     /// # Arguments
     /// * `status` - The status to set (online, away, dnd, offline)
+    /// * `custom_message` - Optional custom status message (e.g., "In a meeting", "Working remotely")
     ///
     /// # Returns
     /// Result indicating success
-    async fn set_status(&self, status: UserStatus) -> Result<()>;
+    ///
+    /// # Notes
+    /// Not all platforms support custom status messages. If provided but not supported,
+    /// the custom message will be silently ignored. Check `capabilities().supports_custom_status`.
+    async fn set_status(&self, status: UserStatus, custom_message: Option<&str>) -> Result<()>;
 
     /// Get a user's status
     ///

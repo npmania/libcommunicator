@@ -141,6 +141,7 @@ pub extern "C" fn communicator_error_code_string(code: ErrorCode) -> *const c_ch
         ErrorCode::PermissionDenied => "Permission denied\0",
         ErrorCode::Timeout => "Timeout\0",
         ErrorCode::InvalidState => "Invalid state\0",
+        ErrorCode::Unsupported => "Feature not supported\0",
     };
     s.as_ptr() as *const c_char
 }
@@ -1156,7 +1157,7 @@ pub extern "C" fn communicator_platform_set_status(
 
     let platform = unsafe { &**handle };
 
-    match runtime::block_on(platform.set_status(user_status)) {
+    match runtime::block_on(platform.set_status(user_status, None)) {
         Ok(()) => ErrorCode::Success,
         Err(e) => {
             let code = e.code;

@@ -1,8 +1,22 @@
 //! Team/workspace types for chat platforms
+//!
+//! This module defines organizational units that group channels/conversations.
+//! Different platforms call this concept by different names:
+//! - Mattermost: Team
+//! - Slack: Workspace
+//! - Discord: Guild/Server
+//! - Microsoft Teams: Team
+//! - Matrix: Space
+//!
+//! Not all platforms have this concept (e.g., IRC, basic Telegram).
+//! Check PlatformCapabilities.has_workspaces before using team-related methods.
 
 use serde::{Deserialize, Serialize};
 
-/// Represents a team or workspace on a chat platform
+/// Represents a team/workspace/guild on a chat platform
+///
+/// This is a generic organizational container that groups channels together.
+/// The exact semantics depend on the platform.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Team {
     /// Unique identifier for this team

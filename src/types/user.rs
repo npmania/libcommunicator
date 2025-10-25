@@ -17,7 +17,8 @@ pub struct User {
     pub avatar_url: Option<String>,
     /// Current status (online, away, offline, etc.)
     pub status: UserStatus,
-    /// Optional status message set by the user
+    /// Optional custom status message/text set by the user (e.g., "In a meeting", "Working remotely")
+    /// Note: Not all platforms support custom status messages - check PlatformCapabilities.supports_custom_status
     pub status_message: Option<String>,
     /// Whether this user is a bot
     pub is_bot: bool,

@@ -36,6 +36,8 @@ pub enum ErrorCode {
     Timeout = 10,
     /// Invalid state for operation
     InvalidState = 11,
+    /// Feature not supported by this platform
+    Unsupported = 12,
 }
 
 impl ErrorCode {
@@ -53,6 +55,7 @@ impl ErrorCode {
             ErrorCode::PermissionDenied => "Permission denied",
             ErrorCode::Timeout => "Timeout",
             ErrorCode::InvalidState => "Invalid state",
+            ErrorCode::Unsupported => "Feature not supported",
         }
     }
 }
@@ -82,6 +85,10 @@ impl Error {
 
     pub fn invalid_argument(msg: impl Into<String>) -> Self {
         Error::new(ErrorCode::InvalidArgument, msg)
+    }
+
+    pub fn unsupported(msg: impl Into<String>) -> Self {
+        Error::new(ErrorCode::Unsupported, msg)
     }
 }
 

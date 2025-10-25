@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::{Platform, PlatformConfig, PlatformEvent};
-use crate::types::{Channel, ConnectionInfo, Message, Team, User};
+use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 
 use super::client::MattermostClient;
 use super::websocket::WebSocketManager;
@@ -15,6 +15,7 @@ pub struct MattermostPlatform {
     connection_info: Option<ConnectionInfo>,
     websocket: Arc<Mutex<Option<WebSocketManager>>>,
     server_url: String,
+    capabilities: PlatformCapabilities,
 }
 
 impl MattermostPlatform {
@@ -26,6 +27,7 @@ impl MattermostPlatform {
             connection_info: None,
             websocket: Arc::new(Mutex::new(None)),
             server_url: server_url.to_string(),
+            capabilities: PlatformCapabilities::mattermost(),
         })
     }
 
@@ -37,6 +39,10 @@ impl MattermostPlatform {
 
 #[async_trait]
 impl Platform for MattermostPlatform {
+    fn capabilities(&self) -> &PlatformCapabilities {
+        &self.capabilities
+    }
+
     async fn connect(&mut self, config: PlatformConfig) -> Result<ConnectionInfo> {
         // Determine authentication method from credentials
         if let Some(token) = config.credentials.get("token") {
@@ -173,9 +179,18 @@ impl Platform for MattermostPlatform {
         Ok(mm_team.into())
     }
 
-    async fn set_status(&self, status: crate::types::user::UserStatus) -> Result<()> {
+    async fn set_status(&self, status: crate::types::user::UserStatus, custom_message: Option<&str>) -> Result<()> {
         let status_str = super::user_status_to_status_string(status);
         self.client.set_status(status_str).await?;
+
+        // TODO: Mattermost supports custom status messages via a separate API endpoint
+        // For now, we're ignoring the custom_message parameter
+        // Future enhancement: call the custom status API if custom_message is provided
+        if custom_message.is_some() {
+            // Log that this feature is not yet implemented
+            eprintln!("Warning: Custom status messages are not yet implemented for Mattermost");
+        }
+
         Ok(())
     }
 
