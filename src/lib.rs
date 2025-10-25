@@ -25,7 +25,7 @@ pub const VERSION_STRING: &str = concat!(
 
 /// FFI function: Free a string allocated by this library
 #[no_mangle]
-pub extern "C" fn communicator_free_string(s: *mut c_char) {
+pub unsafe extern "C" fn communicator_free_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
             let _ = CString::from_raw(s);
@@ -41,7 +41,7 @@ pub extern "C" fn communicator_free_string(s: *mut c_char) {
 /// This should be called once before using any other library functions
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_init() -> ErrorCode {
+pub unsafe extern "C" fn communicator_init() -> ErrorCode {
     error::clear_last_error();
 
     // Initialize the async runtime
@@ -59,7 +59,7 @@ pub extern "C" fn communicator_init() -> ErrorCode {
 /// This should be called once when done using the library
 /// Frees any global resources allocated by the library
 #[no_mangle]
-pub extern "C" fn communicator_cleanup() {
+pub unsafe extern "C" fn communicator_cleanup() {
     error::clear_last_error();
 
     // Shutdown the async runtime
@@ -73,25 +73,25 @@ pub extern "C" fn communicator_cleanup() {
 /// FFI function: Get the library version string
 /// Returns a static string, do NOT free this pointer
 #[no_mangle]
-pub extern "C" fn communicator_version() -> *const c_char {
+pub unsafe extern "C" fn communicator_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), " (libcommunicator)\0").as_ptr() as *const c_char
 }
 
 /// FFI function: Get the major version number
 #[no_mangle]
-pub extern "C" fn communicator_version_major() -> u32 {
+pub unsafe extern "C" fn communicator_version_major() -> u32 {
     VERSION_MAJOR
 }
 
 /// FFI function: Get the minor version number
 #[no_mangle]
-pub extern "C" fn communicator_version_minor() -> u32 {
+pub unsafe extern "C" fn communicator_version_minor() -> u32 {
     VERSION_MINOR
 }
 
 /// FFI function: Get the patch version number
 #[no_mangle]
-pub extern "C" fn communicator_version_patch() -> u32 {
+pub unsafe extern "C" fn communicator_version_patch() -> u32 {
     VERSION_PATCH
 }
 
@@ -102,7 +102,7 @@ pub extern "C" fn communicator_version_patch() -> u32 {
 /// FFI function: Get the error code of the last error
 /// Returns ErrorCode::Success (0) if no error has occurred
 #[no_mangle]
-pub extern "C" fn communicator_last_error_code() -> ErrorCode {
+pub unsafe extern "C" fn communicator_last_error_code() -> ErrorCode {
     error::get_last_error()
         .map(|e| e.code)
         .unwrap_or(ErrorCode::Success)
@@ -112,7 +112,7 @@ pub extern "C" fn communicator_last_error_code() -> ErrorCode {
 /// Returns a dynamically allocated string that must be freed with communicator_free_string()
 /// Returns NULL if no error has occurred
 #[no_mangle]
-pub extern "C" fn communicator_last_error_message() -> *mut c_char {
+pub unsafe extern "C" fn communicator_last_error_message() -> *mut c_char {
     let error = match error::get_last_error() {
         Some(e) => e,
         None => return std::ptr::null_mut(),
@@ -127,7 +127,7 @@ pub extern "C" fn communicator_last_error_message() -> *mut c_char {
 /// FFI function: Get a human-readable description of an error code
 /// Returns a static string, do NOT free this pointer
 #[no_mangle]
-pub extern "C" fn communicator_error_code_string(code: ErrorCode) -> *const c_char {
+pub unsafe extern "C" fn communicator_error_code_string(code: ErrorCode) -> *const c_char {
     let s = match code {
         ErrorCode::Success => "Success\0",
         ErrorCode::Unknown => "Unknown error\0",
@@ -148,7 +148,7 @@ pub extern "C" fn communicator_error_code_string(code: ErrorCode) -> *const c_ch
 
 /// FFI function: Clear the last error
 #[no_mangle]
-pub extern "C" fn communicator_clear_error() {
+pub unsafe extern "C" fn communicator_clear_error() {
     error::clear_last_error();
 }
 
@@ -165,7 +165,7 @@ pub type ContextHandle = *mut Context;
 /// The handle must be freed with communicator_context_destroy()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_context_create(id: *const c_char) -> ContextHandle {
+pub unsafe extern "C" fn communicator_context_create(id: *const c_char) -> ContextHandle {
     error::clear_last_error();
 
     if id.is_null() {
@@ -173,7 +173,7 @@ pub extern "C" fn communicator_context_create(id: *const c_char) -> ContextHandl
         return std::ptr::null_mut();
     }
 
-    let id_str = unsafe {
+    let id_str = {
         match std::ffi::CStr::from_ptr(id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -190,7 +190,7 @@ pub extern "C" fn communicator_context_create(id: *const c_char) -> ContextHandl
 /// FFI function: Initialize a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_context_initialize(handle: ContextHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_context_initialize(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -198,7 +198,7 @@ pub extern "C" fn communicator_context_initialize(handle: ContextHandle) -> Erro
         return ErrorCode::NullPointer;
     }
 
-    let context = unsafe { &mut *handle };
+    let context = &mut *handle;
 
     match context.initialize() {
         Ok(()) => ErrorCode::Success,
@@ -213,7 +213,7 @@ pub extern "C" fn communicator_context_initialize(handle: ContextHandle) -> Erro
 /// FFI function: Check if a context is initialized
 /// Returns 1 if initialized, 0 if not, -1 on error
 #[no_mangle]
-pub extern "C" fn communicator_context_is_initialized(handle: ContextHandle) -> i32 {
+pub unsafe extern "C" fn communicator_context_is_initialized(handle: ContextHandle) -> i32 {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -221,14 +221,14 @@ pub extern "C" fn communicator_context_is_initialized(handle: ContextHandle) -> 
         return -1;
     }
 
-    let context = unsafe { &*handle };
+    let context = &*handle;
     if context.is_initialized() { 1 } else { 0 }
 }
 
 /// FFI function: Set a configuration value on a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_context_set_config(
+pub unsafe extern "C" fn communicator_context_set_config(
     handle: ContextHandle,
     key: *const c_char,
     value: *const c_char,
@@ -240,7 +240,7 @@ pub extern "C" fn communicator_context_set_config(
         return ErrorCode::NullPointer;
     }
 
-    let key_str = unsafe {
+    let key_str = {
         match std::ffi::CStr::from_ptr(key).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -250,7 +250,7 @@ pub extern "C" fn communicator_context_set_config(
         }
     };
 
-    let value_str = unsafe {
+    let value_str = {
         match std::ffi::CStr::from_ptr(value).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -260,7 +260,7 @@ pub extern "C" fn communicator_context_set_config(
         }
     };
 
-    let context = unsafe { &mut *handle };
+    let context = &mut *handle;
     context.set_config(key_str, value_str);
     ErrorCode::Success
 }
@@ -269,7 +269,7 @@ pub extern "C" fn communicator_context_set_config(
 /// Returns a dynamically allocated string that must be freed with communicator_free_string()
 /// Returns NULL if the key doesn't exist or on error
 #[no_mangle]
-pub extern "C" fn communicator_context_get_config(
+pub unsafe extern "C" fn communicator_context_get_config(
     handle: ContextHandle,
     key: *const c_char,
 ) -> *mut c_char {
@@ -280,7 +280,7 @@ pub extern "C" fn communicator_context_get_config(
         return std::ptr::null_mut();
     }
 
-    let key_str = unsafe {
+    let key_str = {
         match std::ffi::CStr::from_ptr(key).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -290,7 +290,7 @@ pub extern "C" fn communicator_context_get_config(
         }
     };
 
-    let context = unsafe { &*handle };
+    let context = &*handle;
 
     match context.get_config(key_str) {
         Some(value) => match CString::new(value.as_str()) {
@@ -313,7 +313,7 @@ pub extern "C" fn communicator_context_get_config(
 /// FFI function: Shutdown a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_context_shutdown(handle: ContextHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_context_shutdown(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -321,7 +321,7 @@ pub extern "C" fn communicator_context_shutdown(handle: ContextHandle) -> ErrorC
         return ErrorCode::NullPointer;
     }
 
-    let context = unsafe { &mut *handle };
+    let context = &mut *handle;
 
     match context.shutdown() {
         Ok(()) => ErrorCode::Success,
@@ -336,7 +336,7 @@ pub extern "C" fn communicator_context_shutdown(handle: ContextHandle) -> ErrorC
 /// FFI function: Destroy a context and free its memory
 /// After calling this, the handle is invalid and must not be used
 #[no_mangle]
-pub extern "C" fn communicator_context_destroy(handle: ContextHandle) {
+pub unsafe extern "C" fn communicator_context_destroy(handle: ContextHandle) {
     if !handle.is_null() {
         unsafe {
             let _ = Box::from_raw(handle);
@@ -352,7 +352,7 @@ pub extern "C" fn communicator_context_destroy(handle: ContextHandle) {
 /// The callback will be called for logging events
 /// user_data is an opaque pointer passed back to the callback
 #[no_mangle]
-pub extern "C" fn communicator_context_set_log_callback(
+pub unsafe extern "C" fn communicator_context_set_log_callback(
     handle: ContextHandle,
     callback: LogCallback,
     user_data: *mut c_void,
@@ -364,14 +364,14 @@ pub extern "C" fn communicator_context_set_log_callback(
         return ErrorCode::NullPointer;
     }
 
-    let context = unsafe { &mut *handle };
+    let context = &mut *handle;
     context.set_log_callback(callback, user_data);
     ErrorCode::Success
 }
 
 /// FFI function: Clear the log callback on a context
 #[no_mangle]
-pub extern "C" fn communicator_context_clear_log_callback(handle: ContextHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_context_clear_log_callback(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -379,7 +379,7 @@ pub extern "C" fn communicator_context_clear_log_callback(handle: ContextHandle)
         return ErrorCode::NullPointer;
     }
 
-    let context = unsafe { &mut *handle };
+    let context = &mut *handle;
     context.clear_log_callback();
     ErrorCode::Success
 }
@@ -396,7 +396,7 @@ pub type PlatformHandle = *mut Box<dyn Platform>;
 /// The handle must be freed with communicator_platform_destroy()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> PlatformHandle {
+pub unsafe extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> PlatformHandle {
     error::clear_last_error();
 
     if server_url.is_null() {
@@ -404,7 +404,7 @@ pub extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> P
         return std::ptr::null_mut();
     }
 
-    let url_str = unsafe {
+    let url_str = {
         match std::ffi::CStr::from_ptr(server_url).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -437,7 +437,7 @@ pub extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> P
 /// }
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_connect(
+pub unsafe extern "C" fn communicator_platform_connect(
     handle: PlatformHandle,
     config_json: *const c_char,
 ) -> ErrorCode {
@@ -448,7 +448,7 @@ pub extern "C" fn communicator_platform_connect(
         return ErrorCode::NullPointer;
     }
 
-    let config_str = unsafe {
+    let config_str = {
         match std::ffi::CStr::from_ptr(config_json).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -481,7 +481,7 @@ pub extern "C" fn communicator_platform_connect(
     platform_config.credentials = config_data.credentials;
     platform_config.team_id = config_data.team_id;
 
-    let platform = unsafe { &mut **handle };
+    let platform = &mut **handle;
 
     // Run async connect in blocking mode
     match runtime::block_on(platform.connect(platform_config)) {
@@ -497,7 +497,7 @@ pub extern "C" fn communicator_platform_connect(
 /// FFI function: Disconnect from a platform
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_disconnect(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_disconnect(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -505,7 +505,7 @@ pub extern "C" fn communicator_platform_disconnect(handle: PlatformHandle) -> Er
         return ErrorCode::NullPointer;
     }
 
-    let platform = unsafe { &mut **handle };
+    let platform = &mut **handle;
 
     match runtime::block_on(platform.disconnect()) {
         Ok(()) => ErrorCode::Success,
@@ -520,7 +520,7 @@ pub extern "C" fn communicator_platform_disconnect(handle: PlatformHandle) -> Er
 /// FFI function: Check if platform is connected
 /// Returns 1 if connected, 0 if not, -1 on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_is_connected(handle: PlatformHandle) -> i32 {
+pub unsafe extern "C" fn communicator_platform_is_connected(handle: PlatformHandle) -> i32 {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -528,7 +528,7 @@ pub extern "C" fn communicator_platform_is_connected(handle: PlatformHandle) -> 
         return -1;
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
     if platform.is_connected() { 1 } else { 0 }
 }
 
@@ -536,7 +536,7 @@ pub extern "C" fn communicator_platform_is_connected(handle: PlatformHandle) -> 
 /// Returns a dynamically allocated JSON string that must be freed with communicator_free_string()
 /// Returns NULL on error or if not connected
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_connection_info(
+pub unsafe extern "C" fn communicator_platform_get_connection_info(
     handle: PlatformHandle,
 ) -> *mut c_char {
     error::clear_last_error();
@@ -546,7 +546,7 @@ pub extern "C" fn communicator_platform_get_connection_info(
         return std::ptr::null_mut();
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match platform.connection_info() {
         Some(info) => match serde_json::to_string(info) {
@@ -583,7 +583,7 @@ pub extern "C" fn communicator_platform_get_connection_info(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_send_message(
+pub unsafe extern "C" fn communicator_platform_send_message(
     handle: PlatformHandle,
     channel_id: *const c_char,
     text: *const c_char,
@@ -595,7 +595,7 @@ pub extern "C" fn communicator_platform_send_message(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -605,7 +605,7 @@ pub extern "C" fn communicator_platform_send_message(
         }
     };
 
-    let text_str = unsafe {
+    let text_str = {
         match std::ffi::CStr::from_ptr(text).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -615,7 +615,7 @@ pub extern "C" fn communicator_platform_send_message(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.send_message(channel_id_str, text_str)) {
         Ok(message) => match serde_json::to_string(&message) {
@@ -649,7 +649,7 @@ pub extern "C" fn communicator_platform_send_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> *mut c_char {
+pub unsafe extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -657,7 +657,7 @@ pub extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> 
         return std::ptr::null_mut();
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_channels()) {
         Ok(channels) => match serde_json::to_string(&channels) {
@@ -691,7 +691,7 @@ pub extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> 
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_channel(
+pub unsafe extern "C" fn communicator_platform_get_channel(
     handle: PlatformHandle,
     channel_id: *const c_char,
 ) -> *mut c_char {
@@ -702,7 +702,7 @@ pub extern "C" fn communicator_platform_get_channel(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -712,7 +712,7 @@ pub extern "C" fn communicator_platform_get_channel(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_channel(channel_id_str)) {
         Ok(channel) => match serde_json::to_string(&channel) {
@@ -746,7 +746,7 @@ pub extern "C" fn communicator_platform_get_channel(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_messages(
+pub unsafe extern "C" fn communicator_platform_get_messages(
     handle: PlatformHandle,
     channel_id: *const c_char,
     limit: u32,
@@ -758,7 +758,7 @@ pub extern "C" fn communicator_platform_get_messages(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -768,7 +768,7 @@ pub extern "C" fn communicator_platform_get_messages(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_messages(channel_id_str, limit as usize)) {
         Ok(messages) => match serde_json::to_string(&messages) {
@@ -802,7 +802,7 @@ pub extern "C" fn communicator_platform_get_messages(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_channel_members(
+pub unsafe extern "C" fn communicator_platform_get_channel_members(
     handle: PlatformHandle,
     channel_id: *const c_char,
 ) -> *mut c_char {
@@ -813,7 +813,7 @@ pub extern "C" fn communicator_platform_get_channel_members(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -823,7 +823,7 @@ pub extern "C" fn communicator_platform_get_channel_members(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_channel_members(channel_id_str)) {
         Ok(users) => match serde_json::to_string(&users) {
@@ -857,7 +857,7 @@ pub extern "C" fn communicator_platform_get_channel_members(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_user(
+pub unsafe extern "C" fn communicator_platform_get_user(
     handle: PlatformHandle,
     user_id: *const c_char,
 ) -> *mut c_char {
@@ -868,7 +868,7 @@ pub extern "C" fn communicator_platform_get_user(
         return std::ptr::null_mut();
     }
 
-    let user_id_str = unsafe {
+    let user_id_str = {
         match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -878,7 +878,7 @@ pub extern "C" fn communicator_platform_get_user(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_user(user_id_str)) {
         Ok(user) => match serde_json::to_string(&user) {
@@ -912,7 +912,7 @@ pub extern "C" fn communicator_platform_get_user(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle) -> *mut c_char {
+pub unsafe extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -920,7 +920,7 @@ pub extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle)
         return std::ptr::null_mut();
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_current_user()) {
         Ok(user) => match serde_json::to_string(&user) {
@@ -954,7 +954,7 @@ pub extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle)
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_create_direct_channel(
+pub unsafe extern "C" fn communicator_platform_create_direct_channel(
     handle: PlatformHandle,
     user_id: *const c_char,
 ) -> *mut c_char {
@@ -965,7 +965,7 @@ pub extern "C" fn communicator_platform_create_direct_channel(
         return std::ptr::null_mut();
     }
 
-    let user_id_str = unsafe {
+    let user_id_str = {
         match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -975,7 +975,7 @@ pub extern "C" fn communicator_platform_create_direct_channel(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.create_direct_channel(user_id_str)) {
         Ok(channel) => match serde_json::to_string(&channel) {
@@ -1008,8 +1008,11 @@ pub extern "C" fn communicator_platform_create_direct_channel(
 /// Returns a JSON string representing an array of Teams
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
+///
+/// # Safety
+/// The caller must ensure that `handle` is a valid pointer
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mut c_char {
+pub unsafe extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1017,7 +1020,7 @@ pub extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mu
         return std::ptr::null_mut();
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_teams()) {
         Ok(teams) => match serde_json::to_string(&teams) {
@@ -1051,7 +1054,7 @@ pub extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mu
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_team(
+pub unsafe extern "C" fn communicator_platform_get_team(
     handle: PlatformHandle,
     team_id: *const c_char,
 ) -> *mut c_char {
@@ -1062,7 +1065,7 @@ pub extern "C" fn communicator_platform_get_team(
         return std::ptr::null_mut();
     }
 
-    let team_id_str = unsafe {
+    let team_id_str = {
         match std::ffi::CStr::from_ptr(team_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1072,7 +1075,7 @@ pub extern "C" fn communicator_platform_get_team(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_team(team_id_str)) {
         Ok(team) => match serde_json::to_string(&team) {
@@ -1108,7 +1111,7 @@ pub extern "C" fn communicator_platform_get_team(
 /// * `handle` - Platform handle
 /// * `status` - Status string: "online", "away", "dnd", or "offline"
 #[no_mangle]
-pub extern "C" fn communicator_platform_set_status(
+pub unsafe extern "C" fn communicator_platform_set_status(
     handle: PlatformHandle,
     status: *const c_char,
 ) -> ErrorCode {
@@ -1119,7 +1122,7 @@ pub extern "C" fn communicator_platform_set_status(
         return ErrorCode::NullPointer;
     }
 
-    let status_str = unsafe {
+    let status_str = {
         match std::ffi::CStr::from_ptr(status).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1144,7 +1147,7 @@ pub extern "C" fn communicator_platform_set_status(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.set_status(user_status, None)) {
         Ok(()) => ErrorCode::Success,
@@ -1161,7 +1164,7 @@ pub extern "C" fn communicator_platform_set_status(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_user_status(
+pub unsafe extern "C" fn communicator_platform_get_user_status(
     handle: PlatformHandle,
     user_id: *const c_char,
 ) -> *mut c_char {
@@ -1172,7 +1175,7 @@ pub extern "C" fn communicator_platform_get_user_status(
         return std::ptr::null_mut();
     }
 
-    let user_id_str = unsafe {
+    let user_id_str = {
         match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1182,7 +1185,7 @@ pub extern "C" fn communicator_platform_get_user_status(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_user_status(user_id_str)) {
         Ok(status) => {
@@ -1232,7 +1235,7 @@ pub extern "C" fn communicator_platform_get_user_status(
 /// * `channel_id` - The channel ID to send typing indicator to
 /// * `parent_id` - Optional parent post ID for thread typing (pass NULL for regular channel typing)
 #[no_mangle]
-pub extern "C" fn communicator_platform_send_typing_indicator(
+pub unsafe extern "C" fn communicator_platform_send_typing_indicator(
     handle: PlatformHandle,
     channel_id: *const c_char,
     parent_id: *const c_char,
@@ -1244,7 +1247,7 @@ pub extern "C" fn communicator_platform_send_typing_indicator(
         return ErrorCode::NullPointer;
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1275,7 +1278,7 @@ pub extern "C" fn communicator_platform_send_typing_indicator(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.send_typing_indicator(channel_id_str, parent_id_str)) {
         Ok(()) => ErrorCode::Success,
@@ -1290,7 +1293,7 @@ pub extern "C" fn communicator_platform_send_typing_indicator(
 /// FFI function: Subscribe to real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1298,7 +1301,7 @@ pub extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle)
         return ErrorCode::NullPointer;
     }
 
-    let platform = unsafe { &mut **handle };
+    let platform = &mut **handle;
 
     match runtime::block_on(platform.subscribe_events()) {
         Ok(()) => ErrorCode::Success,
@@ -1313,7 +1316,7 @@ pub extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle)
 /// FFI function: Unsubscribe from real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1321,7 +1324,7 @@ pub extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandl
         return ErrorCode::NullPointer;
     }
 
-    let platform = unsafe { &mut **handle };
+    let platform = &mut **handle;
 
     match runtime::block_on(platform.unsubscribe_events()) {
         Ok(()) => ErrorCode::Success,
@@ -1338,7 +1341,7 @@ pub extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandl
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL if no events or on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *mut c_char {
+pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1346,7 +1349,7 @@ pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *m
         return std::ptr::null_mut();
     }
 
-    let platform = unsafe { &mut **handle };
+    let platform = &mut **handle;
 
     match runtime::block_on(platform.poll_event()) {
         Ok(Some(event)) => {
@@ -1536,7 +1539,7 @@ pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *m
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_send_reply(
+pub unsafe extern "C" fn communicator_platform_send_reply(
     handle: PlatformHandle,
     channel_id: *const c_char,
     text: *const c_char,
@@ -1549,7 +1552,7 @@ pub extern "C" fn communicator_platform_send_reply(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1559,7 +1562,7 @@ pub extern "C" fn communicator_platform_send_reply(
         }
     };
 
-    let text_str = unsafe {
+    let text_str = {
         match std::ffi::CStr::from_ptr(text).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1569,7 +1572,7 @@ pub extern "C" fn communicator_platform_send_reply(
         }
     };
 
-    let root_id_str = unsafe {
+    let root_id_str = {
         match std::ffi::CStr::from_ptr(root_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1579,7 +1582,7 @@ pub extern "C" fn communicator_platform_send_reply(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.send_reply(channel_id_str, text_str, root_id_str)) {
         Ok(message) => match serde_json::to_string(&message) {
@@ -1613,7 +1616,7 @@ pub extern "C" fn communicator_platform_send_reply(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_update_message(
+pub unsafe extern "C" fn communicator_platform_update_message(
     handle: PlatformHandle,
     message_id: *const c_char,
     new_text: *const c_char,
@@ -1625,7 +1628,7 @@ pub extern "C" fn communicator_platform_update_message(
         return std::ptr::null_mut();
     }
 
-    let message_id_str = unsafe {
+    let message_id_str = {
         match std::ffi::CStr::from_ptr(message_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1635,7 +1638,7 @@ pub extern "C" fn communicator_platform_update_message(
         }
     };
 
-    let text_str = unsafe {
+    let text_str = {
         match std::ffi::CStr::from_ptr(new_text).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1645,7 +1648,7 @@ pub extern "C" fn communicator_platform_update_message(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.update_message(message_id_str, text_str)) {
         Ok(message) => match serde_json::to_string(&message) {
@@ -1677,7 +1680,7 @@ pub extern "C" fn communicator_platform_update_message(
 /// FFI function: Delete a message
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_delete_message(
+pub unsafe extern "C" fn communicator_platform_delete_message(
     handle: PlatformHandle,
     message_id: *const c_char,
 ) -> ErrorCode {
@@ -1688,7 +1691,7 @@ pub extern "C" fn communicator_platform_delete_message(
         return ErrorCode::NullPointer;
     }
 
-    let message_id_str = unsafe {
+    let message_id_str = {
         match std::ffi::CStr::from_ptr(message_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1698,7 +1701,7 @@ pub extern "C" fn communicator_platform_delete_message(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.delete_message(message_id_str)) {
         Ok(()) => ErrorCode::Success,
@@ -1715,7 +1718,7 @@ pub extern "C" fn communicator_platform_delete_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_message(
+pub unsafe extern "C" fn communicator_platform_get_message(
     handle: PlatformHandle,
     message_id: *const c_char,
 ) -> *mut c_char {
@@ -1726,7 +1729,7 @@ pub extern "C" fn communicator_platform_get_message(
         return std::ptr::null_mut();
     }
 
-    let message_id_str = unsafe {
+    let message_id_str = {
         match std::ffi::CStr::from_ptr(message_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1736,7 +1739,7 @@ pub extern "C" fn communicator_platform_get_message(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_message(message_id_str)) {
         Ok(message) => match serde_json::to_string(&message) {
@@ -1770,7 +1773,7 @@ pub extern "C" fn communicator_platform_get_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_search_messages(
+pub unsafe extern "C" fn communicator_platform_search_messages(
     handle: PlatformHandle,
     query: *const c_char,
     limit: u32,
@@ -1782,7 +1785,7 @@ pub extern "C" fn communicator_platform_search_messages(
         return std::ptr::null_mut();
     }
 
-    let query_str = unsafe {
+    let query_str = {
         match std::ffi::CStr::from_ptr(query).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1792,7 +1795,7 @@ pub extern "C" fn communicator_platform_search_messages(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.search_messages(query_str, limit as usize)) {
         Ok(messages) => match serde_json::to_string(&messages) {
@@ -1826,7 +1829,7 @@ pub extern "C" fn communicator_platform_search_messages(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_messages_before(
+pub unsafe extern "C" fn communicator_platform_get_messages_before(
     handle: PlatformHandle,
     channel_id: *const c_char,
     before_id: *const c_char,
@@ -1839,7 +1842,7 @@ pub extern "C" fn communicator_platform_get_messages_before(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1849,7 +1852,7 @@ pub extern "C" fn communicator_platform_get_messages_before(
         }
     };
 
-    let before_id_str = unsafe {
+    let before_id_str = {
         match std::ffi::CStr::from_ptr(before_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1859,7 +1862,7 @@ pub extern "C" fn communicator_platform_get_messages_before(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_messages_before(channel_id_str, before_id_str, limit as usize)) {
         Ok(messages) => match serde_json::to_string(&messages) {
@@ -1893,7 +1896,7 @@ pub extern "C" fn communicator_platform_get_messages_before(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_messages_after(
+pub unsafe extern "C" fn communicator_platform_get_messages_after(
     handle: PlatformHandle,
     channel_id: *const c_char,
     after_id: *const c_char,
@@ -1906,7 +1909,7 @@ pub extern "C" fn communicator_platform_get_messages_after(
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1916,7 +1919,7 @@ pub extern "C" fn communicator_platform_get_messages_after(
         }
     };
 
-    let after_id_str = unsafe {
+    let after_id_str = {
         match std::ffi::CStr::from_ptr(after_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1926,7 +1929,7 @@ pub extern "C" fn communicator_platform_get_messages_after(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_messages_after(channel_id_str, after_id_str, limit as usize)) {
         Ok(messages) => match serde_json::to_string(&messages) {
@@ -1960,7 +1963,7 @@ pub extern "C" fn communicator_platform_get_messages_after(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_channel_by_name(
+pub unsafe extern "C" fn communicator_platform_get_channel_by_name(
     handle: PlatformHandle,
     team_id: *const c_char,
     channel_name: *const c_char,
@@ -1972,7 +1975,7 @@ pub extern "C" fn communicator_platform_get_channel_by_name(
         return std::ptr::null_mut();
     }
 
-    let team_id_str = unsafe {
+    let team_id_str = {
         match std::ffi::CStr::from_ptr(team_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1982,7 +1985,7 @@ pub extern "C" fn communicator_platform_get_channel_by_name(
         }
     };
 
-    let channel_name_str = unsafe {
+    let channel_name_str = {
         match std::ffi::CStr::from_ptr(channel_name).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -1992,7 +1995,7 @@ pub extern "C" fn communicator_platform_get_channel_by_name(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_channel_by_name(team_id_str, channel_name_str)) {
         Ok(channel) => match serde_json::to_string(&channel) {
@@ -2027,7 +2030,7 @@ pub extern "C" fn communicator_platform_get_channel_by_name(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_create_group_channel(
+pub unsafe extern "C" fn communicator_platform_create_group_channel(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
 ) -> *mut c_char {
@@ -2038,7 +2041,7 @@ pub extern "C" fn communicator_platform_create_group_channel(
         return std::ptr::null_mut();
     }
 
-    let user_ids_str = unsafe {
+    let user_ids_str = {
         match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2060,7 +2063,7 @@ pub extern "C" fn communicator_platform_create_group_channel(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.create_group_channel(user_ids)) {
         Ok(channel) => match serde_json::to_string(&channel) {
@@ -2092,7 +2095,7 @@ pub extern "C" fn communicator_platform_create_group_channel(
 /// FFI function: Add a user to a channel
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_add_channel_member(
+pub unsafe extern "C" fn communicator_platform_add_channel_member(
     handle: PlatformHandle,
     channel_id: *const c_char,
     user_id: *const c_char,
@@ -2104,7 +2107,7 @@ pub extern "C" fn communicator_platform_add_channel_member(
         return ErrorCode::NullPointer;
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2114,7 +2117,7 @@ pub extern "C" fn communicator_platform_add_channel_member(
         }
     };
 
-    let user_id_str = unsafe {
+    let user_id_str = {
         match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2124,7 +2127,7 @@ pub extern "C" fn communicator_platform_add_channel_member(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.add_channel_member(channel_id_str, user_id_str)) {
         Ok(()) => ErrorCode::Success,
@@ -2139,7 +2142,7 @@ pub extern "C" fn communicator_platform_add_channel_member(
 /// FFI function: Remove a user from a channel
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_remove_channel_member(
+pub unsafe extern "C" fn communicator_platform_remove_channel_member(
     handle: PlatformHandle,
     channel_id: *const c_char,
     user_id: *const c_char,
@@ -2151,7 +2154,7 @@ pub extern "C" fn communicator_platform_remove_channel_member(
         return ErrorCode::NullPointer;
     }
 
-    let channel_id_str = unsafe {
+    let channel_id_str = {
         match std::ffi::CStr::from_ptr(channel_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2161,7 +2164,7 @@ pub extern "C" fn communicator_platform_remove_channel_member(
         }
     };
 
-    let user_id_str = unsafe {
+    let user_id_str = {
         match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2171,7 +2174,7 @@ pub extern "C" fn communicator_platform_remove_channel_member(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.remove_channel_member(channel_id_str, user_id_str)) {
         Ok(()) => ErrorCode::Success,
@@ -2188,7 +2191,7 @@ pub extern "C" fn communicator_platform_remove_channel_member(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_user_by_username(
+pub unsafe extern "C" fn communicator_platform_get_user_by_username(
     handle: PlatformHandle,
     username: *const c_char,
 ) -> *mut c_char {
@@ -2199,7 +2202,7 @@ pub extern "C" fn communicator_platform_get_user_by_username(
         return std::ptr::null_mut();
     }
 
-    let username_str = unsafe {
+    let username_str = {
         match std::ffi::CStr::from_ptr(username).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2209,7 +2212,7 @@ pub extern "C" fn communicator_platform_get_user_by_username(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_user_by_username(username_str)) {
         Ok(user) => match serde_json::to_string(&user) {
@@ -2243,7 +2246,7 @@ pub extern "C" fn communicator_platform_get_user_by_username(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_user_by_email(
+pub unsafe extern "C" fn communicator_platform_get_user_by_email(
     handle: PlatformHandle,
     email: *const c_char,
 ) -> *mut c_char {
@@ -2254,7 +2257,7 @@ pub extern "C" fn communicator_platform_get_user_by_email(
         return std::ptr::null_mut();
     }
 
-    let email_str = unsafe {
+    let email_str = {
         match std::ffi::CStr::from_ptr(email).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2264,7 +2267,7 @@ pub extern "C" fn communicator_platform_get_user_by_email(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_user_by_email(email_str)) {
         Ok(user) => match serde_json::to_string(&user) {
@@ -2299,7 +2302,7 @@ pub extern "C" fn communicator_platform_get_user_by_email(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_users_by_ids(
+pub unsafe extern "C" fn communicator_platform_get_users_by_ids(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
 ) -> *mut c_char {
@@ -2310,7 +2313,7 @@ pub extern "C" fn communicator_platform_get_users_by_ids(
         return std::ptr::null_mut();
     }
 
-    let user_ids_str = unsafe {
+    let user_ids_str = {
         match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2332,7 +2335,7 @@ pub extern "C" fn communicator_platform_get_users_by_ids(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_users_by_ids(user_ids)) {
         Ok(users) => match serde_json::to_string(&users) {
@@ -2370,7 +2373,7 @@ pub extern "C" fn communicator_platform_get_users_by_ids(
 /// }
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_set_custom_status(
+pub unsafe extern "C" fn communicator_platform_set_custom_status(
     handle: PlatformHandle,
     custom_status_json: *const c_char,
 ) -> ErrorCode {
@@ -2381,7 +2384,7 @@ pub extern "C" fn communicator_platform_set_custom_status(
         return ErrorCode::NullPointer;
     }
 
-    let status_str = unsafe {
+    let status_str = {
         match std::ffi::CStr::from_ptr(custom_status_json).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2410,7 +2413,7 @@ pub extern "C" fn communicator_platform_set_custom_status(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.set_custom_status(
         status_data.emoji.as_deref(),
@@ -2429,7 +2432,7 @@ pub extern "C" fn communicator_platform_set_custom_status(
 /// FFI function: Remove/clear the current user's custom status
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
-pub extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -2437,7 +2440,7 @@ pub extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHan
         return ErrorCode::NullPointer;
     }
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.remove_custom_status()) {
         Ok(()) => ErrorCode::Success,
@@ -2455,7 +2458,7 @@ pub extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHan
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_users_status(
+pub unsafe extern "C" fn communicator_platform_get_users_status(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
 ) -> *mut c_char {
@@ -2466,7 +2469,7 @@ pub extern "C" fn communicator_platform_get_users_status(
         return std::ptr::null_mut();
     }
 
-    let user_ids_str = unsafe {
+    let user_ids_str = {
         match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -2488,7 +2491,7 @@ pub extern "C" fn communicator_platform_get_users_status(
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_users_status(user_ids)) {
         Ok(status_map) => {
@@ -2538,8 +2541,11 @@ pub extern "C" fn communicator_platform_get_users_status(
 /// Returns a JSON string representing the Team
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
+///
+/// # Safety
+/// The caller must ensure that `handle` and `team_name` are valid pointers
 #[no_mangle]
-pub extern "C" fn communicator_platform_get_team_by_name(
+pub unsafe extern "C" fn communicator_platform_get_team_by_name(
     handle: PlatformHandle,
     team_name: *const c_char,
 ) -> *mut c_char {
@@ -2550,17 +2556,15 @@ pub extern "C" fn communicator_platform_get_team_by_name(
         return std::ptr::null_mut();
     }
 
-    let team_name_str = unsafe {
-        match std::ffi::CStr::from_ptr(team_name).to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                error::set_last_error(Error::invalid_utf8());
-                return std::ptr::null_mut();
-            }
+    let team_name_str = match std::ffi::CStr::from_ptr(team_name).to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            error::set_last_error(Error::invalid_utf8());
+            return std::ptr::null_mut();
         }
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.get_team_by_name(team_name_str)) {
         Ok(team) => match serde_json::to_string(&team) {
@@ -2592,8 +2596,12 @@ pub extern "C" fn communicator_platform_get_team_by_name(
 /// FFI function: Set the active team/workspace ID
 /// team_id: The team ID to set as active (pass NULL to unset)
 /// Returns ErrorCode indicating success or failure
+///
+/// # Safety
+/// The caller must ensure that `handle` is a valid pointer.
+/// If `team_id` is not NULL, it must be a valid C string pointer.
 #[no_mangle]
-pub extern "C" fn communicator_platform_set_team_id(
+pub unsafe extern "C" fn communicator_platform_set_team_id(
     handle: PlatformHandle,
     team_id: *const c_char,
 ) -> ErrorCode {
@@ -2608,19 +2616,17 @@ pub extern "C" fn communicator_platform_set_team_id(
     let team_id_opt = if team_id.is_null() {
         None
     } else {
-        let team_id_str = unsafe {
-            match std::ffi::CStr::from_ptr(team_id).to_str() {
-                Ok(s) => s,
-                Err(_) => {
-                    error::set_last_error(Error::invalid_utf8());
-                    return ErrorCode::InvalidUtf8;
-                }
+        let team_id_str = match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
             }
         };
         Some(team_id_str.to_string())
     };
 
-    let platform = unsafe { &**handle };
+    let platform = &**handle;
 
     match runtime::block_on(platform.set_team_id(team_id_opt)) {
         Ok(()) => ErrorCode::Success,
@@ -2634,12 +2640,14 @@ pub extern "C" fn communicator_platform_set_team_id(
 
 /// FFI function: Destroy a platform and free its memory
 /// After calling this, the handle is invalid and must not be used
+///
+/// # Safety
+/// The caller must ensure that `handle` is a valid pointer that was created by
+/// this library and has not been freed already.
 #[no_mangle]
-pub extern "C" fn communicator_platform_destroy(handle: PlatformHandle) {
+pub unsafe extern "C" fn communicator_platform_destroy(handle: PlatformHandle) {
     if !handle.is_null() {
-        unsafe {
-            let _ = Box::from_raw(handle);
-        }
+        let _ = Box::from_raw(handle);
     }
 }
 
