@@ -298,6 +298,17 @@ pub fn status_string_to_user_status(status: &str) -> UserStatus {
     }
 }
 
+/// Helper function to convert UserStatus to a status string
+pub fn user_status_to_status_string(status: UserStatus) -> &'static str {
+    match status {
+        UserStatus::Online => "online",
+        UserStatus::Away => "away",
+        UserStatus::DoNotDisturb => "dnd",
+        UserStatus::Offline => "offline",
+        UserStatus::Unknown => "offline",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

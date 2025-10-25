@@ -2,6 +2,7 @@
 
 use crate::error::Result;
 use crate::types::{Channel, ConnectionInfo, Message, Team, User};
+use crate::types::user::UserStatus;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -163,6 +164,24 @@ pub trait Platform: Send + Sync {
     /// # Returns
     /// The team details
     async fn get_team(&self, team_id: &str) -> Result<Team>;
+
+    /// Set the current user's status
+    ///
+    /// # Arguments
+    /// * `status` - The status to set (online, away, dnd, offline)
+    ///
+    /// # Returns
+    /// Result indicating success
+    async fn set_status(&self, status: UserStatus) -> Result<()>;
+
+    /// Get a user's status
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    ///
+    /// # Returns
+    /// The user's status
+    async fn get_user_status(&self, user_id: &str) -> Result<UserStatus>;
 
     /// Subscribe to real-time events (WebSocket, webhook, etc.)
     ///

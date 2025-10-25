@@ -173,6 +173,17 @@ impl Platform for MattermostPlatform {
         Ok(mm_team.into())
     }
 
+    async fn set_status(&self, status: crate::types::user::UserStatus) -> Result<()> {
+        let status_str = super::user_status_to_status_string(status);
+        self.client.set_status(status_str).await?;
+        Ok(())
+    }
+
+    async fn get_user_status(&self, user_id: &str) -> Result<crate::types::user::UserStatus> {
+        let mm_status = self.client.get_user_status(user_id).await?;
+        Ok(super::status_string_to_user_status(&mm_status.status))
+    }
+
     async fn subscribe_events(&mut self) -> Result<()> {
         let token = self.client.get_token().await.ok_or_else(|| {
             Error::new(

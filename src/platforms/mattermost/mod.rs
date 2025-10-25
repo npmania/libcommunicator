@@ -10,12 +10,13 @@ mod client;
 mod convert;
 mod platform_impl;
 mod posts;
+mod status;
 mod teams;
 mod types;
 mod users;
 mod websocket;
 
 pub use client::MattermostClient;
-pub use convert::status_string_to_user_status;
+pub use convert::{status_string_to_user_status, user_status_to_status_string};
 pub use platform_impl::MattermostPlatform;
 pub use types::*;

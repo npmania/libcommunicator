@@ -1111,6 +1111,130 @@ pub extern "C" fn communicator_platform_get_team(
     }
 }
 
+/// FFI function: Set the current user's status
+/// Returns ErrorCode indicating success or failure
+///
+/// # Arguments
+/// * `handle` - Platform handle
+/// * `status` - Status string: "online", "away", "dnd", or "offline"
+#[no_mangle]
+pub extern "C" fn communicator_platform_set_status(
+    handle: PlatformHandle,
+    status: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || status.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let status_str = unsafe {
+        match std::ffi::CStr::from_ptr(status).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    // Convert status string to UserStatus
+    let user_status = match status_str {
+        "online" => crate::types::user::UserStatus::Online,
+        "away" => crate::types::user::UserStatus::Away,
+        "dnd" => crate::types::user::UserStatus::DoNotDisturb,
+        "offline" => crate::types::user::UserStatus::Offline,
+        _ => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                "Invalid status. Must be one of: online, away, dnd, offline",
+            ));
+            return ErrorCode::InvalidArgument;
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.set_status(user_status)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get a user's status
+/// Returns a JSON string representing the status: {"status": "online"}
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_user_status(
+    handle: PlatformHandle,
+    user_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let user_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_user_status(user_id_str)) {
+        Ok(status) => {
+            // Convert UserStatus to JSON
+            let status_str = match status {
+                crate::types::user::UserStatus::Online => "online",
+                crate::types::user::UserStatus::Away => "away",
+                crate::types::user::UserStatus::DoNotDisturb => "dnd",
+                crate::types::user::UserStatus::Offline => "offline",
+                crate::types::user::UserStatus::Unknown => "unknown",
+            };
+
+            let json = serde_json::json!({"status": status_str});
+
+            match serde_json::to_string(&json) {
+                Ok(json_str) => match CString::new(json_str) {
+                    Ok(c_string) => c_string.into_raw(),
+                    Err(_) => {
+                        error::set_last_error(Error::new(
+                            ErrorCode::OutOfMemory,
+                            "Failed to allocate string",
+                        ));
+                        std::ptr::null_mut()
+                    }
+                },
+                Err(e) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        &format!("Failed to serialize status: {}", e),
+                    ));
+                    std::ptr::null_mut()
+                }
+            }
+        }
+        Err(e) => {
+            let _code = e.code;
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// FFI function: Subscribe to real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]

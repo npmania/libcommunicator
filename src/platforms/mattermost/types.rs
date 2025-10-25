@@ -283,6 +283,43 @@ impl CreatePostRequest {
     }
 }
 
+/// User status response from Mattermost API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MattermostStatus {
+    pub user_id: String,
+    pub status: String, // "online", "away", "dnd", "offline"
+    #[serde(default)]
+    pub manual: bool,
+    #[serde(default)]
+    pub last_activity_at: i64,
+}
+
+/// Custom status for a user
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomStatus {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<String>, // Duration like "thirty_minutes", "one_hour", "today", "this_week"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>, // ISO 8601 timestamp
+}
+
+/// Request to set user status
+#[derive(Debug, Clone, Serialize)]
+pub struct SetStatusRequest {
+    pub user_id: String,
+    pub status: String, // "online", "away", "dnd", "offline"
+}
+
+/// Request to get statuses for multiple users
+#[derive(Debug, Clone, Serialize)]
+pub struct GetStatusesByIdsRequest {
+    pub user_ids: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
