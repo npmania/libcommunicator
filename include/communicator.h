@@ -440,6 +440,349 @@ CommunicatorErrorCode communicator_platform_unsubscribe_events(CommunicatorPlatf
  */
 char* communicator_platform_poll_event(CommunicatorPlatform platform);
 
+// ============================================================================
+// Extended Message Operations
+// ============================================================================
+
+/**
+ * Send a reply to a message (threaded conversation)
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param text The reply text
+ * @param root_id The ID of the root message to reply to
+ * @return A JSON string representing the created Message
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_send_reply(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* text,
+    const char* root_id
+);
+
+/**
+ * Update/edit a message
+ *
+ * @param platform The platform handle
+ * @param message_id The ID of the message to update
+ * @param new_text The new message text
+ * @return A JSON string representing the updated Message
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_update_message(
+    CommunicatorPlatform platform,
+    const char* message_id,
+    const char* new_text
+);
+
+/**
+ * Delete a message
+ *
+ * @param platform The platform handle
+ * @param message_id The ID of the message to delete
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_delete_message(
+    CommunicatorPlatform platform,
+    const char* message_id
+);
+
+/**
+ * Get a specific message by ID
+ *
+ * @param platform The platform handle
+ * @param message_id The message ID
+ * @return A JSON string representing the Message
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_message(
+    CommunicatorPlatform platform,
+    const char* message_id
+);
+
+/**
+ * Search for messages
+ *
+ * @param platform The platform handle
+ * @param query The search query
+ * @param limit Maximum number of messages to retrieve
+ * @return A JSON array string of Message objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_search_messages(
+    CommunicatorPlatform platform,
+    const char* query,
+    uint32_t limit
+);
+
+/**
+ * Get messages before a specific message (pagination)
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param before_id The message ID to get messages before
+ * @param limit Maximum number of messages to retrieve
+ * @return A JSON array string of Message objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_messages_before(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* before_id,
+    uint32_t limit
+);
+
+/**
+ * Get messages after a specific message (pagination)
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param after_id The message ID to get messages after
+ * @param limit Maximum number of messages to retrieve
+ * @return A JSON array string of Message objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_messages_after(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* after_id,
+    uint32_t limit
+);
+
+// ============================================================================
+// Extended Channel Operations
+// ============================================================================
+
+/**
+ * Get a channel by name
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID
+ * @param channel_name The channel name
+ * @return A JSON string representing the Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_channel_by_name(
+    CommunicatorPlatform platform,
+    const char* team_id,
+    const char* channel_name
+);
+
+/**
+ * Create a group direct message channel
+ *
+ * @param platform The platform handle
+ * @param user_ids_json JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+ * @return A JSON string representing the created Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_create_group_channel(
+    CommunicatorPlatform platform,
+    const char* user_ids_json
+);
+
+/**
+ * Add a user to a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param user_id The user ID to add
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_add_channel_member(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* user_id
+);
+
+/**
+ * Remove a user from a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param user_id The user ID to remove
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_remove_channel_member(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* user_id
+);
+
+// ============================================================================
+// Extended User Operations
+// ============================================================================
+
+/**
+ * Get a user by username
+ *
+ * @param platform The platform handle
+ * @param username The username
+ * @return A JSON string representing the User
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user_by_username(
+    CommunicatorPlatform platform,
+    const char* username
+);
+
+/**
+ * Get a user by email
+ *
+ * @param platform The platform handle
+ * @param email The email address
+ * @return A JSON string representing the User
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user_by_email(
+    CommunicatorPlatform platform,
+    const char* email
+);
+
+/**
+ * Get multiple users by their IDs (batch operation)
+ *
+ * @param platform The platform handle
+ * @param user_ids_json JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+ * @return A JSON array string of User objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_users_by_ids(
+    CommunicatorPlatform platform,
+    const char* user_ids_json
+);
+
+// ============================================================================
+// Team Management
+// ============================================================================
+
+/**
+ * Get all teams the user belongs to
+ *
+ * @param platform The platform handle
+ * @return A JSON array string of Team objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_teams(CommunicatorPlatform platform);
+
+/**
+ * Get a specific team by ID
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID
+ * @return A JSON string representing the Team
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_team(
+    CommunicatorPlatform platform,
+    const char* team_id
+);
+
+/**
+ * Get a team by name
+ *
+ * @param platform The platform handle
+ * @param team_name The team name
+ * @return A JSON string representing the Team
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_team_by_name(
+    CommunicatorPlatform platform,
+    const char* team_name
+);
+
+// ============================================================================
+// User Status Management
+// ============================================================================
+
+/**
+ * Set the current user's status
+ *
+ * @param platform The platform handle
+ * @param status Status string: "online", "away", "dnd", or "offline"
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_set_status(
+    CommunicatorPlatform platform,
+    const char* status
+);
+
+/**
+ * Get a user's status
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @return A JSON string representing the status: {"status": "online"}
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user_status(
+    CommunicatorPlatform platform,
+    const char* user_id
+);
+
+/**
+ * Get status for multiple users (batch operation)
+ *
+ * @param platform The platform handle
+ * @param user_ids_json JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+ * @return A JSON object mapping user IDs to status strings: {"user1": "online", "user2": "away", ...}
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_users_status(
+    CommunicatorPlatform platform,
+    const char* user_ids_json
+);
+
+// ============================================================================
+// Custom Status Management
+// ============================================================================
+
+/**
+ * Set a custom status message
+ *
+ * @param platform The platform handle
+ * @param custom_status_json JSON object with format:
+ *                          {
+ *                            "emoji": "optional-emoji",
+ *                            "text": "status text",
+ *                            "expires_at": 1234567890  // Optional Unix timestamp
+ *                          }
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_set_custom_status(
+    CommunicatorPlatform platform,
+    const char* custom_status_json
+);
+
+/**
+ * Remove/clear the current user's custom status
+ *
+ * @param platform The platform handle
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_remove_custom_status(CommunicatorPlatform platform);
+
+// ============================================================================
+// Platform Cleanup
+// ============================================================================
+
 /**
  * Destroy a platform and free its memory
  * After calling this, the handle is invalid and must not be used
