@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
 
 use crate::types::user::UserStatus;
-use crate::types::{Attachment, Channel, ChannelType, Message, User};
+use crate::types::{Attachment, Channel, ChannelType, Message, Team, TeamType, User};
 
 use super::channels::get_dm_partner_id;
-use super::types::{FileInfo, MattermostChannel, MattermostPost, MattermostUser};
+use super::types::{FileInfo, MattermostChannel, MattermostPost, MattermostTeam, MattermostUser};
 
 /// Context for converting Mattermost types to generic types
 /// Provides necessary information like server URL and current user ID
@@ -242,6 +242,51 @@ impl From<MattermostChannel> for Channel {
     }
 }
 
+/// Convert Mattermost Team to our internal Team type
+impl From<MattermostTeam> for Team {
+    fn from(mm_team: MattermostTeam) -> Self {
+        // Map Mattermost team type ("O" or "I") to TeamType enum
+        let team_type = match mm_team.team_type.as_str() {
+            "O" => TeamType::Open,
+            "I" => TeamType::Invite,
+            _ => TeamType::Invite, // Default to invite-only
+        };
+
+        // Create metadata with Mattermost-specific fields
+        let metadata = serde_json::json!({
+            "company_name": mm_team.company_name,
+            "email": mm_team.email,
+            "invite_id": mm_team.invite_id,
+            "create_at": mm_team.create_at,
+            "update_at": mm_team.update_at,
+            "delete_at": mm_team.delete_at,
+        });
+
+        let description = if mm_team.description.is_empty() {
+            None
+        } else {
+            Some(mm_team.description)
+        };
+
+        let allowed_domains = if mm_team.allowed_domains.is_empty() {
+            None
+        } else {
+            Some(mm_team.allowed_domains)
+        };
+
+        Team {
+            id: mm_team.id,
+            name: mm_team.name,
+            display_name: mm_team.display_name,
+            description,
+            team_type,
+            allowed_domains,
+            allow_open_invite: mm_team.allow_open_invite,
+            metadata: Some(metadata),
+        }
+    }
+}
+
 /// Helper function to convert a status string to UserStatus
 pub fn status_string_to_user_status(status: &str) -> UserStatus {
     match status {
@@ -325,5 +370,58 @@ mod tests {
         let timestamp_ms = 1234567890000i64;
         let dt = timestamp_to_datetime(timestamp_ms);
         assert_eq!(dt.timestamp(), 1234567890);
+    }
+
+    #[test]
+    fn test_team_conversion() {
+        let mm_team = MattermostTeam {
+            id: "team123".to_string(),
+            create_at: 1234567890000,
+            update_at: 1234567890000,
+            delete_at: 0,
+            display_name: "Engineering Team".to_string(),
+            name: "engineering".to_string(),
+            description: "Our engineering team".to_string(),
+            email: "eng@example.com".to_string(),
+            team_type: "O".to_string(),
+            company_name: "ACME Inc".to_string(),
+            allowed_domains: "example.com".to_string(),
+            invite_id: "inv123".to_string(),
+            allow_open_invite: true,
+        };
+
+        let team: Team = mm_team.into();
+        assert_eq!(team.id, "team123");
+        assert_eq!(team.name, "engineering");
+        assert_eq!(team.display_name, "Engineering Team");
+        assert_eq!(team.description, Some("Our engineering team".to_string()));
+        assert_eq!(team.team_type, TeamType::Open);
+        assert_eq!(team.allowed_domains, Some("example.com".to_string()));
+        assert!(team.allow_open_invite);
+    }
+
+    #[test]
+    fn test_team_conversion_invite_only() {
+        let mm_team = MattermostTeam {
+            id: "team456".to_string(),
+            create_at: 1234567890000,
+            update_at: 1234567890000,
+            delete_at: 0,
+            display_name: "Private Team".to_string(),
+            name: "private".to_string(),
+            description: String::new(),
+            email: String::new(),
+            team_type: "I".to_string(),
+            company_name: String::new(),
+            allowed_domains: String::new(),
+            invite_id: String::new(),
+            allow_open_invite: false,
+        };
+
+        let team: Team = mm_team.into();
+        assert_eq!(team.team_type, TeamType::Invite);
+        assert_eq!(team.description, None);
+        assert_eq!(team.allowed_domains, None);
+        assert!(!team.allow_open_invite);
     }
 }

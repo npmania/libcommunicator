@@ -10,6 +10,7 @@ mod client;
 mod convert;
 mod platform_impl;
 mod posts;
+mod teams;
 mod types;
 mod users;
 mod websocket;

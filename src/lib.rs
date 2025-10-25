@@ -12,7 +12,7 @@ pub mod types;
 pub use context::{Context, LogCallback, LogLevel};
 pub use error::{Error, ErrorCode, Result};
 pub use platforms::{Platform, PlatformConfig, PlatformEvent};
-pub use types::{Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Message, User};
+pub use types::{Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Message, Team, TeamType, User};
 
 // Library version information
 pub const VERSION_MAJOR: u32 = 0;
@@ -1000,6 +1000,105 @@ pub extern "C" fn communicator_platform_create_direct_channel(
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
                     &format!("Failed to serialize channel: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get all teams the user belongs to
+/// Returns a JSON string representing an array of Teams
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_teams()) {
+        Ok(teams) => match serde_json::to_string(&teams) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize teams: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get a specific team by ID
+/// Returns a JSON string representing the Team
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_team(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_team(team_id_str)) {
+        Ok(team) => match serde_json::to_string(&team) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize team: {}", e),
                 ));
                 std::ptr::null_mut()
             }

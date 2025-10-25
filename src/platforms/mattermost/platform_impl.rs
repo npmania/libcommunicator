@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::{Platform, PlatformConfig, PlatformEvent};
-use crate::types::{Channel, ConnectionInfo, Message, User};
+use crate::types::{Channel, ConnectionInfo, Message, Team, User};
 
 use super::client::MattermostClient;
 use super::websocket::WebSocketManager;
@@ -161,6 +161,16 @@ impl Platform for MattermostPlatform {
     async fn create_direct_channel(&self, user_id: &str) -> Result<Channel> {
         let mm_channel = self.client.create_direct_channel(user_id).await?;
         Ok(mm_channel.into())
+    }
+
+    async fn get_teams(&self) -> Result<Vec<Team>> {
+        let mm_teams = self.client.get_teams().await?;
+        Ok(mm_teams.into_iter().map(|t| t.into()).collect())
+    }
+
+    async fn get_team(&self, team_id: &str) -> Result<Team> {
+        let mm_team = self.client.get_team(team_id).await?;
+        Ok(mm_team.into())
     }
 
     async fn subscribe_events(&mut self) -> Result<()> {

@@ -1,7 +1,7 @@
 //! Platform trait defining the interface all platform adapters must implement
 
 use crate::error::Result;
-use crate::types::{Channel, ConnectionInfo, Message, User};
+use crate::types::{Channel, ConnectionInfo, Message, Team, User};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -148,6 +148,21 @@ pub trait Platform: Send + Sync {
     /// # Returns
     /// The created or existing DM channel
     async fn create_direct_channel(&self, user_id: &str) -> Result<Channel>;
+
+    /// Get all teams/workspaces the user belongs to
+    ///
+    /// # Returns
+    /// List of teams
+    async fn get_teams(&self) -> Result<Vec<Team>>;
+
+    /// Get details about a specific team
+    ///
+    /// # Arguments
+    /// * `team_id` - The team ID
+    ///
+    /// # Returns
+    /// The team details
+    async fn get_team(&self, team_id: &str) -> Result<Team>;
 
     /// Subscribe to real-time events (WebSocket, webhook, etc.)
     ///
