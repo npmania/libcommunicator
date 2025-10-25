@@ -161,3 +161,97 @@ Key Rust crates:
 - The spec can be viewed in OpenAPI-compatible tools (Swagger UI, Postman, etc.)
 - Official Mattermost documentation: https://api.mattermost.com/
 - Consider using code generation tools like `openapi-generator` for type scaffolding
+
+### FFI Design Guidelines
+
+**Keep the FFI Generic and Platform-Agnostic**:
+- The FFI layer must work for ALL chat platforms (Mattermost, Slack, Discord, Teams, etc.)
+- Never expose platform-specific types or functions at the FFI boundary
+- Use generic abstractions like `Client`, `Message`, `Channel`, `User` instead of platform-specific ones
+- Platform-specific details should be handled internally in Rust, not exposed to FFI consumers
+
+**FFI Update Workflow**:
+When adding new functionality:
+1. **Design in Rust First**: Implement the feature in Rust with proper abstractions
+2. **Evaluate Generality**: Ensure the feature can work across multiple platforms
+3. **Add FFI Functions**: Only add to `ffi.rs` if the functionality is generic enough
+4. **Update C Headers**: Regenerate headers using `cbindgen` or update manually
+5. **Update Go Bindings**: Synchronize Go wrapper functions in `bindings/go/`
+6. **Document Changes**: Update relevant documentation and examples
+
+**When to Add FFI Functions**:
+- ✅ Generic operations: connect, disconnect, send message, get channels, get users
+- ✅ Common callbacks: on_message, on_error, on_connection_status
+- ✅ Universal configuration: set timeout, set log level, set credentials
+- ❌ Platform-specific features: Mattermost playbooks, Slack workflows, Discord voice
+- ❌ Implementation details: HTTP headers, API rate limits, internal caching
+
+**FFI Function Naming Convention**:
+```c
+// Good: Generic and clear
+communicator_client_send_message(client, channel_id, text)
+communicator_client_get_channels(client)
+communicator_set_callback_message(client, callback)
+
+// Bad: Platform-specific
+mattermost_client_create_post(client, post)
+slack_send_block_kit_message(client, blocks)
+```
+
+### Go Bindings Update Workflow
+
+When the FFI changes, update Go bindings in this order:
+
+1. **Update Low-Level Bindings** (`bindings/go/communicator/ffi.go`):
+   - Add new C function declarations
+   - Define corresponding Go types that match C types
+   - Use proper cgo types: `C.char`, `*C.char`, `C.int`, `unsafe.Pointer`, etc.
+
+2. **Update High-Level API** (`bindings/go/communicator/client.go` or similar):
+   - Create idiomatic Go wrapper functions
+   - Convert between Go types and C types
+   - Handle memory management (freeing C strings, etc.)
+   - Add proper error handling (convert C error codes to Go errors)
+   - Add Go documentation comments
+
+3. **Update Examples** (`bindings/go/examples/`):
+   - Add new example code demonstrating the new functionality
+   - Ensure examples are simple and clear
+   - Test that examples compile and run
+
+4. **Memory Management Rules**:
+   - Go must free any strings allocated by Rust using the provided free functions
+   - Use `defer C.free(unsafe.Pointer(cStr))` pattern for C strings
+   - Never keep C pointers beyond the function scope without proper lifetime management
+   - Use finalizers for long-lived opaque handles: `runtime.SetFinalizer(obj, cleanup)`
+
+5. **Error Handling Pattern**:
+```go
+// In Go bindings
+func (c *Client) SendMessage(channelID, text string) error {
+    cChannelID := C.CString(channelID)
+    defer C.free(unsafe.Pointer(cChannelID))
+
+    cText := C.CString(text)
+    defer C.free(unsafe.Pointer(cText))
+
+    result := C.communicator_client_send_message(c.handle, cChannelID, cText)
+    if result != 0 {
+        return fmt.Errorf("failed to send message: error code %d", result)
+    }
+    return nil
+}
+```
+
+6. **Testing**:
+   - Add unit tests where possible
+   - Create integration test examples
+   - Test on all target platforms (Linux, macOS, Windows)
+
+**Key Principles for Go Bindings**:
+- Make the Go API idiomatic (not just a direct C wrapper)
+- Use Go error handling (return `error` not error codes)
+- Use Go strings (not `*C.char`)
+- Use Go slices and maps (not C arrays)
+- Hide all `unsafe` operations inside the binding layer
+- Provide type safety wherever possible
