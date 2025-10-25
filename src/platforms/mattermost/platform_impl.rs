@@ -171,17 +171,8 @@ impl Platform for MattermostPlatform {
             )
         })?;
 
-        // Get the base URL from connection info
-        let server_url = self
-            .connection_info
-            .as_ref()
-            .map(|_| {
-                // We need to reconstruct this from the client
-                // In a real implementation, you might want to store the server URL
-                // For now, we'll use a placeholder
-                "wss://mattermost.example.com".to_string()
-            })
-            .unwrap_or_else(|| "wss://mattermost.example.com".to_string());
+        // Use the stored server URL
+        let server_url = &self.server_url;
 
         let mut ws_manager = WebSocketManager::new(&server_url, token);
         ws_manager.connect().await?;
