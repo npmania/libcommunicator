@@ -271,13 +271,17 @@ pub struct WebSocketEvent {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct WebSocketBroadcast {
     #[serde(default)]
-    pub omit_users: HashMap<String, bool>,
+    pub omit_users: Option<HashMap<String, bool>>,
     #[serde(default)]
     pub user_id: String,
     #[serde(default)]
     pub channel_id: String,
     #[serde(default)]
     pub team_id: String,
+    #[serde(default)]
+    pub connection_id: String,
+    #[serde(default)]
+    pub omit_connection_id: String,
 }
 
 /// WebSocket authentication challenge
