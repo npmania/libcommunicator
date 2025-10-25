@@ -1,0 +1,132 @@
+package libcommunicator
+
+import "time"
+
+// ConnectionState represents the state of a platform connection
+type ConnectionState string
+
+const (
+	StateDisconnected ConnectionState = "disconnected"
+	StateConnecting   ConnectionState = "connecting"
+	StateConnected    ConnectionState = "connected"
+	StateReconnecting ConnectionState = "reconnecting"
+	StateError        ConnectionState = "error"
+)
+
+// ChannelType represents the type of channel
+type ChannelType string
+
+const (
+	ChannelTypePublic  ChannelType = "public"
+	ChannelTypePrivate ChannelType = "private"
+	ChannelTypeDirect  ChannelType = "direct"
+	ChannelTypeGroup   ChannelType = "group"
+)
+
+// User represents a user on the platform
+type User struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Status   string `json:"status,omitempty"`
+}
+
+// Channel represents a communication channel
+type Channel struct {
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	DisplayName string      `json:"display_name,omitempty"`
+	Type        ChannelType `json:"type"`
+	TeamID      string      `json:"team_id,omitempty"`
+}
+
+// Attachment represents a file attachment
+type Attachment struct {
+	ID       string `json:"id"`
+	Filename string `json:"filename"`
+	MimeType string `json:"mime_type,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+	URL      string `json:"url,omitempty"`
+}
+
+// Message represents a chat message
+type Message struct {
+	ID          string       `json:"id"`
+	ChannelID   string       `json:"channel_id"`
+	UserID      string       `json:"user_id"`
+	Text        string       `json:"text"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
+}
+
+// ConnectionInfo represents connection information
+type ConnectionInfo struct {
+	State     ConnectionState `json:"state"`
+	ServerURL string          `json:"server_url"`
+	UserID    string          `json:"user_id,omitempty"`
+	TeamID    string          `json:"team_id,omitempty"`
+}
+
+// Event represents a platform event
+type Event struct {
+	Type string      `json:"type"`
+	Data interface{} `json:"data,omitempty"`
+
+	// Event-specific fields
+	MessageID string `json:"message_id,omitempty"`
+	ChannelID string `json:"channel_id,omitempty"`
+	UserID    string `json:"user_id,omitempty"`
+	Status    string `json:"status,omitempty"`
+	State     string `json:"state,omitempty"`
+}
+
+// EventType constants
+const (
+	EventMessagePosted         = "message_posted"
+	EventMessageUpdated        = "message_updated"
+	EventMessageDeleted        = "message_deleted"
+	EventUserStatusChanged     = "user_status_changed"
+	EventUserTyping            = "user_typing"
+	EventChannelCreated        = "channel_created"
+	EventChannelUpdated        = "channel_updated"
+	EventChannelDeleted        = "channel_deleted"
+	EventUserJoinedChannel     = "user_joined_channel"
+	EventUserLeftChannel       = "user_left_channel"
+	EventConnectionStateChange = "connection_state_changed"
+)
+
+// PlatformConfig holds configuration for connecting to a platform
+type PlatformConfig struct {
+	Server      string            `json:"server"`
+	Credentials map[string]string `json:"credentials"`
+	TeamID      string            `json:"team_id,omitempty"`
+}
+
+// NewPlatformConfig creates a new platform configuration
+func NewPlatformConfig(serverURL string) *PlatformConfig {
+	return &PlatformConfig{
+		Server:      serverURL,
+		Credentials: make(map[string]string),
+	}
+}
+
+// WithToken sets token authentication
+func (c *PlatformConfig) WithToken(token string) *PlatformConfig {
+	c.Credentials["token"] = token
+	return c
+}
+
+// WithPassword sets username/password authentication
+func (c *PlatformConfig) WithPassword(loginID, password string) *PlatformConfig {
+	c.Credentials["login_id"] = loginID
+	c.Credentials["password"] = password
+	return c
+}
+
+// WithTeamID sets the team ID
+func (c *PlatformConfig) WithTeamID(teamID string) *PlatformConfig {
+	c.TeamID = teamID
+	return c
+}
