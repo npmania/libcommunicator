@@ -56,7 +56,7 @@ impl MattermostPlatform {
 
         // For DM channels, fetch the other user's name and use it as display name
         // Note: DM channel "name" field contains user IDs in format "user1id__user2id"
-        if mm_channel.channel_type == "D" {
+        if mm_channel.channel_type.is_direct() {
             if let Some(user_id) = current_user_id {
                 // Check if this is a self-DM (saved messages) - both user IDs are the same
                 if mm_channel.name == format!("{}__{}", user_id, user_id) {
@@ -88,7 +88,7 @@ impl MattermostPlatform {
         }
         // For group channels, we could fetch all participants and build a name
         // For now, we'll use the existing display_name from the API
-        else if mm_channel.channel_type == "G" && (mm_channel.display_name.is_empty() || current_user_id.is_some()) {
+        else if mm_channel.channel_type.is_group() && (mm_channel.display_name.is_empty() || current_user_id.is_some()) {
             // Group channels may need similar treatment
             // This could be enhanced in the future to fetch all member names
             if channel.display_name.is_empty() {

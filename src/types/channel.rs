@@ -13,6 +13,7 @@ pub struct Channel {
     /// Human-readable display name
     pub display_name: String,
     /// Type of channel (public, private, direct message, etc.)
+    #[serde(rename = "type")]
     pub channel_type: ChannelType,
     /// Optional channel topic/description
     pub topic: Option<String>,
@@ -162,5 +163,37 @@ mod tests {
         let channel = Channel::new("ch-1", "old-project", "Old Project", ChannelType::Private)
             .archived();
         assert!(channel.is_archived);
+    }
+
+    #[test]
+    fn test_channel_json_serialization() {
+        let channel = Channel::new("ch-1", "general", "General", ChannelType::Public);
+        let json = serde_json::to_string(&channel).unwrap();
+
+        // Verify that the JSON contains "type" not "channel_type"
+        assert!(json.contains(r#""type":"public"#));
+        assert!(!json.contains("channel_type"));
+    }
+
+    #[test]
+    fn test_channel_json_deserialization() {
+        // Test that we can deserialize from JSON with "type" field
+        let json = r#"{
+            "id": "ch-123",
+            "name": "test-channel",
+            "display_name": "Test Channel",
+            "type": "private",
+            "topic": null,
+            "purpose": null,
+            "member_ids": null,
+            "created_at": "2024-01-01T00:00:00Z",
+            "last_activity_at": null,
+            "is_archived": false,
+            "metadata": null
+        }"#;
+
+        let channel: Channel = serde_json::from_str(json).unwrap();
+        assert_eq!(channel.id, "ch-123");
+        assert_eq!(channel.channel_type, ChannelType::Private);
     }
 }

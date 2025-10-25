@@ -17,10 +17,10 @@ const (
 type ChannelType string
 
 const (
-	ChannelTypePublic  ChannelType = "public"
-	ChannelTypePrivate ChannelType = "private"
-	ChannelTypeDirect  ChannelType = "direct"
-	ChannelTypeGroup   ChannelType = "group"
+	ChannelTypePublic        ChannelType = "public"
+	ChannelTypePrivate       ChannelType = "private"
+	ChannelTypeDirectMessage ChannelType = "direct_message"
+	ChannelTypeGroupMessage  ChannelType = "group_message"
 )
 
 // User represents a user on the platform

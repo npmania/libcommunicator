@@ -1,6 +1,56 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Mattermost channel type
+/// Based on the Mattermost API specification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MattermostChannelType {
+    /// Open/Public channel - "O"
+    #[serde(rename = "O")]
+    Open,
+    /// Private channel - "P"
+    #[serde(rename = "P")]
+    Private,
+    /// Direct message channel - "D"
+    #[serde(rename = "D")]
+    Direct,
+    /// Group message channel - "G"
+    #[serde(rename = "G")]
+    Group,
+}
+
+impl MattermostChannelType {
+    /// Get the string representation of the channel type
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MattermostChannelType::Open => "O",
+            MattermostChannelType::Private => "P",
+            MattermostChannelType::Direct => "D",
+            MattermostChannelType::Group => "G",
+        }
+    }
+
+    /// Check if this is a direct message (1-on-1)
+    pub fn is_direct(&self) -> bool {
+        matches!(self, MattermostChannelType::Direct)
+    }
+
+    /// Check if this is a group message
+    pub fn is_group(&self) -> bool {
+        matches!(self, MattermostChannelType::Group)
+    }
+
+    /// Check if this is a public channel
+    pub fn is_public(&self) -> bool {
+        matches!(self, MattermostChannelType::Open)
+    }
+
+    /// Check if this is a private channel
+    pub fn is_private(&self) -> bool {
+        matches!(self, MattermostChannelType::Private)
+    }
+}
+
 /// Mattermost User object from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MattermostUser {
@@ -40,7 +90,7 @@ pub struct MattermostChannel {
     pub delete_at: i64,
     pub team_id: String,
     #[serde(rename = "type")]
-    pub channel_type: String, // "O" (Open/Public), "P" (Private), "D" (Direct), "G" (Group)
+    pub channel_type: MattermostChannelType,
     pub display_name: String,
     pub name: String,
     #[serde(default)]
@@ -358,5 +408,63 @@ mod tests {
         let json = serde_json::to_string(&login).unwrap();
         assert!(json.contains("login_id"));
         assert!(json.contains("password"));
+    }
+
+    #[test]
+    fn test_channel_type_enum() {
+        // Test string representation
+        assert_eq!(MattermostChannelType::Open.as_str(), "O");
+        assert_eq!(MattermostChannelType::Private.as_str(), "P");
+        assert_eq!(MattermostChannelType::Direct.as_str(), "D");
+        assert_eq!(MattermostChannelType::Group.as_str(), "G");
+
+        // Test helper methods
+        assert!(MattermostChannelType::Direct.is_direct());
+        assert!(!MattermostChannelType::Open.is_direct());
+
+        assert!(MattermostChannelType::Group.is_group());
+        assert!(!MattermostChannelType::Private.is_group());
+
+        assert!(MattermostChannelType::Open.is_public());
+        assert!(!MattermostChannelType::Direct.is_public());
+
+        assert!(MattermostChannelType::Private.is_private());
+        assert!(!MattermostChannelType::Group.is_private());
+    }
+
+    #[test]
+    fn test_channel_type_serialization() {
+        // Test that the enum serializes to the correct string values
+        let open = MattermostChannelType::Open;
+        let json = serde_json::to_string(&open).unwrap();
+        assert_eq!(json, "\"O\"");
+
+        let private = MattermostChannelType::Private;
+        let json = serde_json::to_string(&private).unwrap();
+        assert_eq!(json, "\"P\"");
+
+        let direct = MattermostChannelType::Direct;
+        let json = serde_json::to_string(&direct).unwrap();
+        assert_eq!(json, "\"D\"");
+
+        let group = MattermostChannelType::Group;
+        let json = serde_json::to_string(&group).unwrap();
+        assert_eq!(json, "\"G\"");
+    }
+
+    #[test]
+    fn test_channel_type_deserialization() {
+        // Test that we can deserialize from JSON strings
+        let open: MattermostChannelType = serde_json::from_str("\"O\"").unwrap();
+        assert!(open.is_public());
+
+        let private: MattermostChannelType = serde_json::from_str("\"P\"").unwrap();
+        assert!(private.is_private());
+
+        let direct: MattermostChannelType = serde_json::from_str("\"D\"").unwrap();
+        assert!(direct.is_direct());
+
+        let group: MattermostChannelType = serde_json::from_str("\"G\"").unwrap();
+        assert!(group.is_group());
     }
 }

@@ -169,13 +169,14 @@ impl From<FileInfo> for Attachment {
 impl MattermostChannel {
     /// Convert to Channel with context for better DM display names
     pub fn to_channel_with_context(&self, ctx: &ConversionContext) -> Channel {
+        use super::types::MattermostChannelType;
+
         // Map Mattermost channel type to our ChannelType
-        let channel_type = match self.channel_type.as_str() {
-            "O" => ChannelType::Public,
-            "P" => ChannelType::Private,
-            "D" => ChannelType::DirectMessage,
-            "G" => ChannelType::GroupMessage,
-            _ => ChannelType::Public, // Default to public if unknown
+        let channel_type = match self.channel_type {
+            MattermostChannelType::Open => ChannelType::Public,
+            MattermostChannelType::Private => ChannelType::Private,
+            MattermostChannelType::Direct => ChannelType::DirectMessage,
+            MattermostChannelType::Group => ChannelType::GroupMessage,
         };
 
         let created_at = timestamp_to_datetime(self.create_at);
@@ -196,7 +197,7 @@ impl MattermostChannel {
 
         // For DM channels, try to extract partner user ID from the "name" field
         // Note: DM channel "name" field contains user IDs in format "user1id__user2id"
-        if self.channel_type == "D" {
+        if self.channel_type.is_direct() {
             if let Some(ref user_id) = ctx.current_user_id {
                 if let Some(partner_id) = get_dm_partner_id(&self.name, user_id) {
                     metadata["dm_partner_id"] = serde_json::json!(partner_id);
@@ -344,13 +345,15 @@ mod tests {
 
     #[test]
     fn test_channel_type_conversion() {
+        use crate::platforms::mattermost::types::MattermostChannelType;
+
         let mm_channel = MattermostChannel {
             id: "ch123".to_string(),
             create_at: 1234567890000,
             update_at: 1234567890000,
             delete_at: 0,
             team_id: "team1".to_string(),
-            channel_type: "O".to_string(),
+            channel_type: MattermostChannelType::Open,
             display_name: "General".to_string(),
             name: "general".to_string(),
             header: "Welcome!".to_string(),
