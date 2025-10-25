@@ -1,7 +1,72 @@
 use crate::error::Result;
+use crate::types::ChannelType;
 
 use super::client::MattermostClient;
 use super::types::{ChannelMember, CreateDirectChannelRequest, CreateGroupChannelRequest, MattermostChannel};
+
+/// Parse a direct message channel ID to extract participant user IDs
+///
+/// Mattermost DM channel IDs use the format: `{lower_user_id}__{higher_user_id}`
+/// where user IDs are sorted alphabetically.
+///
+/// # Arguments
+/// * `channel_id` - The channel ID to parse
+///
+/// # Returns
+/// A tuple of (user_id_1, user_id_2) if the ID is a valid DM format, None otherwise
+pub fn parse_dm_channel_id(channel_id: &str) -> Option<(String, String)> {
+    if channel_id.contains("__") {
+        let parts: Vec<&str> = channel_id.split("__").collect();
+        if parts.len() == 2 {
+            return Some((parts[0].to_string(), parts[1].to_string()));
+        }
+    }
+    None
+}
+
+/// Get the other user's ID in a DM channel
+///
+/// # Arguments
+/// * `channel_id` - The DM channel ID
+/// * `current_user_id` - The current user's ID
+///
+/// # Returns
+/// The other user's ID if this is a DM channel with the current user, None otherwise
+pub fn get_dm_partner_id(channel_id: &str, current_user_id: &str) -> Option<String> {
+    if let Some((user1, user2)) = parse_dm_channel_id(channel_id) {
+        if user1 == current_user_id {
+            return Some(user2);
+        } else if user2 == current_user_id {
+            return Some(user1);
+        }
+    }
+    None
+}
+
+/// Detect channel type from ID format
+///
+/// Direct message channels have the format `user_id__user_id` (2 parts)
+/// Group message channels have more than 2 parts separated by `__`
+///
+/// # Arguments
+/// * `channel_id` - The channel ID to analyze
+///
+/// # Returns
+/// The detected channel type, or None if the type cannot be determined from the ID
+pub fn detect_channel_type_from_id(channel_id: &str) -> Option<ChannelType> {
+    if channel_id.contains("__") {
+        let parts: Vec<&str> = channel_id.split("__").collect();
+        if parts.len() == 2 {
+            Some(ChannelType::DirectMessage)
+        } else if parts.len() > 2 {
+            Some(ChannelType::GroupMessage)
+        } else {
+            None
+        }
+    } else {
+        None // Use API-provided type
+    }
+}
 
 impl MattermostClient {
     /// Get all channels for the current user in a specific team
@@ -166,5 +231,66 @@ mod tests {
             client.api_url("/channels/channel123"),
             "https://mattermost.example.com/api/v4/channels/channel123"
         );
+    }
+
+    #[test]
+    fn test_parse_dm_channel_id() {
+        // Valid DM channel ID
+        let dm_id = "t1pn9rb63fnpjrqibgriijcx4r__xei6dqz8xfgm7kqzddjziyofyo";
+        let result = parse_dm_channel_id(dm_id);
+        assert!(result.is_some());
+        let (user1, user2) = result.unwrap();
+        assert_eq!(user1, "t1pn9rb63fnpjrqibgriijcx4r");
+        assert_eq!(user2, "xei6dqz8xfgm7kqzddjziyofyo");
+
+        // Regular channel ID (not a DM)
+        let regular_id = "channel123abc";
+        assert!(parse_dm_channel_id(regular_id).is_none());
+
+        // Invalid format (too many parts)
+        let invalid_id = "user1__user2__user3";
+        assert!(parse_dm_channel_id(invalid_id).is_none());
+    }
+
+    #[test]
+    fn test_get_dm_partner_id() {
+        let dm_id = "abc123__xyz789";
+
+        // Current user is first in the ID
+        let partner = get_dm_partner_id(dm_id, "abc123");
+        assert_eq!(partner, Some("xyz789".to_string()));
+
+        // Current user is second in the ID
+        let partner = get_dm_partner_id(dm_id, "xyz789");
+        assert_eq!(partner, Some("abc123".to_string()));
+
+        // Current user is not in the channel
+        let partner = get_dm_partner_id(dm_id, "other_user");
+        assert!(partner.is_none());
+
+        // Regular channel ID
+        let partner = get_dm_partner_id("regular_channel", "abc123");
+        assert!(partner.is_none());
+    }
+
+    #[test]
+    fn test_detect_channel_type_from_id() {
+        // Direct message (2 users)
+        let dm_id = "user1__user2";
+        assert_eq!(
+            detect_channel_type_from_id(dm_id),
+            Some(ChannelType::DirectMessage)
+        );
+
+        // Group message (3+ users)
+        let gm_id = "user1__user2__user3";
+        assert_eq!(
+            detect_channel_type_from_id(gm_id),
+            Some(ChannelType::GroupMessage)
+        );
+
+        // Regular channel
+        let regular_id = "townSquare123";
+        assert!(detect_channel_type_from_id(regular_id).is_none());
     }
 }
