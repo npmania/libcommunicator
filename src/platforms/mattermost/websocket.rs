@@ -35,12 +35,16 @@ pub struct WebSocketConfig {
     /// Maximum number of events to queue (default: 1000)
     /// When full, oldest events are dropped
     pub max_queue_size: usize,
+    /// Ping interval in seconds (default: 30)
+    /// Sends ping to keep connection alive
+    pub ping_interval_secs: u64,
 }
 
 impl Default for WebSocketConfig {
     fn default() -> Self {
         Self {
             max_queue_size: 1000,
+            ping_interval_secs: 30,
         }
     }
 }
@@ -201,10 +205,13 @@ impl WebSocketManager {
         let event_tx = self.event_tx.clone();
         let connection_state = Arc::clone(&self.connection_state);
         let ws_writer = Arc::clone(&self.ws_writer);
+        let ping_interval = std::time::Duration::from_secs(self.config.ping_interval_secs);
 
         // Spawn a task to handle incoming messages
         tokio::spawn(async move {
             let mut read = read;  // Make read mutable for the task
+            let mut ping_timer = tokio::time::interval(ping_interval);
+            ping_timer.tick().await;  // Skip first immediate tick
 
             loop {
                 tokio::select! {
@@ -215,6 +222,20 @@ impl WebSocketManager {
                                 if let Err(e) = Self::handle_message(text, &event_tx).await {
                                     eprintln!("Error handling WebSocket message: {}", e);
                                 }
+                            }
+                            Some(Ok(Message::Ping(data))) => {
+                                // Respond to ping with pong
+                                if let Some(writer) = ws_writer.lock().await.as_mut() {
+                                    if let Err(e) = writer.send(Message::Pong(data)).await {
+                                        eprintln!("Failed to send pong: {}", e);
+                                        *connection_state.lock().await = ConnectionState::Disconnected;
+                                        *ws_writer.lock().await = None;
+                                        break;
+                                    }
+                                }
+                            }
+                            Some(Ok(Message::Pong(_))) => {
+                                // Pong received - connection is alive
                             }
                             Some(Ok(Message::Close(_))) => {
                                 println!("WebSocket closed by server");
@@ -235,6 +256,17 @@ impl WebSocketManager {
                                 break;
                             }
                             _ => {}
+                        }
+                    }
+                    // Send periodic ping to keep connection alive
+                    _ = ping_timer.tick() => {
+                        if let Some(writer) = ws_writer.lock().await.as_mut() {
+                            if let Err(e) = writer.send(Message::Ping(vec![])).await {
+                                eprintln!("Failed to send ping: {}", e);
+                                *connection_state.lock().await = ConnectionState::Disconnected;
+                                *ws_writer.lock().await = None;
+                                break;
+                            }
                         }
                     }
                     // Handle shutdown signal
@@ -258,7 +290,12 @@ impl WebSocketManager {
     /// Handle an incoming WebSocket message
     async fn handle_message(text: String, event_tx: &mpsc::Sender<PlatformEvent>) -> Result<()> {
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
-            .map_err(|e| Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e)))?;
+            .map_err(|e| {
+                // Log raw message snippet for debugging (first 200 chars)
+                let snippet = &text[..text.len().min(200)];
+                eprintln!("Failed to parse WebSocket event: {} | Raw: {}", e, snippet);
+                Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e))
+            })?;
 
         // Convert WebSocket event to PlatformEvent
         if let Some(platform_event) = Self::convert_event(ws_event) {
@@ -497,7 +534,10 @@ mod tests {
     #[tokio::test]
     async fn test_event_queue_overflow() {
         // Create manager with small queue size
-        let config = WebSocketConfig { max_queue_size: 2 };
+        let config = WebSocketConfig {
+            max_queue_size: 2,
+            ping_interval_secs: 30,
+        };
         let manager = WebSocketManager::with_config(
             "https://mattermost.example.com",
             "token".to_string(),
