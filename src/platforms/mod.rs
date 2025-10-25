@@ -2,7 +2,6 @@
 ///
 /// Each platform module provides an adapter that implements the core
 /// communication interface for that specific service.
-
 mod platform_trait;
 
 pub mod mattermost;

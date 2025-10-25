@@ -25,6 +25,10 @@ pub const VERSION_STRING: &str = concat!(
 
 /// FFI function: Free a string allocated by this library
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_free_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
@@ -41,6 +45,10 @@ pub unsafe extern "C" fn communicator_free_string(s: *mut c_char) {
 /// This should be called once before using any other library functions
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_init() -> ErrorCode {
     error::clear_last_error();
 
@@ -59,6 +67,10 @@ pub unsafe extern "C" fn communicator_init() -> ErrorCode {
 /// This should be called once when done using the library
 /// Frees any global resources allocated by the library
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_cleanup() {
     error::clear_last_error();
 
@@ -73,24 +85,40 @@ pub unsafe extern "C" fn communicator_cleanup() {
 /// FFI function: Get the library version string
 /// Returns a static string, do NOT free this pointer
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_version() -> *const c_char {
     concat!(env!("CARGO_PKG_VERSION"), " (libcommunicator)\0").as_ptr() as *const c_char
 }
 
 /// FFI function: Get the major version number
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_version_major() -> u32 {
     VERSION_MAJOR
 }
 
 /// FFI function: Get the minor version number
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_version_minor() -> u32 {
     VERSION_MINOR
 }
 
 /// FFI function: Get the patch version number
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_version_patch() -> u32 {
     VERSION_PATCH
 }
@@ -102,6 +130,10 @@ pub unsafe extern "C" fn communicator_version_patch() -> u32 {
 /// FFI function: Get the error code of the last error
 /// Returns ErrorCode::Success (0) if no error has occurred
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_last_error_code() -> ErrorCode {
     error::get_last_error()
         .map(|e| e.code)
@@ -112,6 +144,10 @@ pub unsafe extern "C" fn communicator_last_error_code() -> ErrorCode {
 /// Returns a dynamically allocated string that must be freed with communicator_free_string()
 /// Returns NULL if no error has occurred
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_last_error_message() -> *mut c_char {
     let error = match error::get_last_error() {
         Some(e) => e,
@@ -127,6 +163,10 @@ pub unsafe extern "C" fn communicator_last_error_message() -> *mut c_char {
 /// FFI function: Get a human-readable description of an error code
 /// Returns a static string, do NOT free this pointer
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_error_code_string(code: ErrorCode) -> *const c_char {
     let s = match code {
         ErrorCode::Success => "Success\0",
@@ -148,6 +188,10 @@ pub unsafe extern "C" fn communicator_error_code_string(code: ErrorCode) -> *con
 
 /// FFI function: Clear the last error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_clear_error() {
     error::clear_last_error();
 }
@@ -165,6 +209,10 @@ pub type ContextHandle = *mut Context;
 /// The handle must be freed with communicator_context_destroy()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_create(id: *const c_char) -> ContextHandle {
     error::clear_last_error();
 
@@ -190,6 +238,10 @@ pub unsafe extern "C" fn communicator_context_create(id: *const c_char) -> Conte
 /// FFI function: Initialize a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_initialize(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -213,6 +265,10 @@ pub unsafe extern "C" fn communicator_context_initialize(handle: ContextHandle) 
 /// FFI function: Check if a context is initialized
 /// Returns 1 if initialized, 0 if not, -1 on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_is_initialized(handle: ContextHandle) -> i32 {
     error::clear_last_error();
 
@@ -228,6 +284,10 @@ pub unsafe extern "C" fn communicator_context_is_initialized(handle: ContextHand
 /// FFI function: Set a configuration value on a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_set_config(
     handle: ContextHandle,
     key: *const c_char,
@@ -269,6 +329,10 @@ pub unsafe extern "C" fn communicator_context_set_config(
 /// Returns a dynamically allocated string that must be freed with communicator_free_string()
 /// Returns NULL if the key doesn't exist or on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_get_config(
     handle: ContextHandle,
     key: *const c_char,
@@ -313,6 +377,10 @@ pub unsafe extern "C" fn communicator_context_get_config(
 /// FFI function: Shutdown a context
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_shutdown(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -336,6 +404,10 @@ pub unsafe extern "C" fn communicator_context_shutdown(handle: ContextHandle) ->
 /// FFI function: Destroy a context and free its memory
 /// After calling this, the handle is invalid and must not be used
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_destroy(handle: ContextHandle) {
     if !handle.is_null() {
         unsafe {
@@ -352,6 +424,10 @@ pub unsafe extern "C" fn communicator_context_destroy(handle: ContextHandle) {
 /// The callback will be called for logging events
 /// user_data is an opaque pointer passed back to the callback
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_set_log_callback(
     handle: ContextHandle,
     callback: LogCallback,
@@ -371,6 +447,10 @@ pub unsafe extern "C" fn communicator_context_set_log_callback(
 
 /// FFI function: Clear the log callback on a context
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_context_clear_log_callback(handle: ContextHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -396,6 +476,10 @@ pub type PlatformHandle = *mut Box<dyn Platform>;
 /// The handle must be freed with communicator_platform_destroy()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> PlatformHandle {
     error::clear_last_error();
 
@@ -437,6 +521,10 @@ pub unsafe extern "C" fn communicator_mattermost_create(server_url: *const c_cha
 /// }
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_connect(
     handle: PlatformHandle,
     config_json: *const c_char,
@@ -497,6 +585,10 @@ pub unsafe extern "C" fn communicator_platform_connect(
 /// FFI function: Disconnect from a platform
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_disconnect(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -520,6 +612,10 @@ pub unsafe extern "C" fn communicator_platform_disconnect(handle: PlatformHandle
 /// FFI function: Check if platform is connected
 /// Returns 1 if connected, 0 if not, -1 on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_is_connected(handle: PlatformHandle) -> i32 {
     error::clear_last_error();
 
@@ -536,6 +632,10 @@ pub unsafe extern "C" fn communicator_platform_is_connected(handle: PlatformHand
 /// Returns a dynamically allocated JSON string that must be freed with communicator_free_string()
 /// Returns NULL on error or if not connected
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_connection_info(
     handle: PlatformHandle,
 ) -> *mut c_char {
@@ -583,6 +683,10 @@ pub unsafe extern "C" fn communicator_platform_get_connection_info(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_send_message(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -649,6 +753,10 @@ pub unsafe extern "C" fn communicator_platform_send_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_channels(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
@@ -691,6 +799,10 @@ pub unsafe extern "C" fn communicator_platform_get_channels(handle: PlatformHand
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_channel(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -746,6 +858,10 @@ pub unsafe extern "C" fn communicator_platform_get_channel(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_messages(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -802,6 +918,10 @@ pub unsafe extern "C" fn communicator_platform_get_messages(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_channel_members(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -857,6 +977,10 @@ pub unsafe extern "C" fn communicator_platform_get_channel_members(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_user(
     handle: PlatformHandle,
     user_id: *const c_char,
@@ -912,6 +1036,10 @@ pub unsafe extern "C" fn communicator_platform_get_user(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
@@ -954,6 +1082,10 @@ pub unsafe extern "C" fn communicator_platform_get_current_user(handle: Platform
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_create_direct_channel(
     handle: PlatformHandle,
     user_id: *const c_char,
@@ -1012,6 +1144,10 @@ pub unsafe extern "C" fn communicator_platform_create_direct_channel(
 /// # Safety
 /// The caller must ensure that `handle` is a valid pointer
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_teams(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
@@ -1054,6 +1190,10 @@ pub unsafe extern "C" fn communicator_platform_get_teams(handle: PlatformHandle)
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_team(
     handle: PlatformHandle,
     team_id: *const c_char,
@@ -1111,6 +1251,10 @@ pub unsafe extern "C" fn communicator_platform_get_team(
 /// * `handle` - Platform handle
 /// * `status` - Status string: "online", "away", "dnd", or "offline"
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_set_status(
     handle: PlatformHandle,
     status: *const c_char,
@@ -1164,6 +1308,10 @@ pub unsafe extern "C" fn communicator_platform_set_status(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_user_status(
     handle: PlatformHandle,
     user_id: *const c_char,
@@ -1235,6 +1383,10 @@ pub unsafe extern "C" fn communicator_platform_get_user_status(
 /// * `channel_id` - The channel ID to send typing indicator to
 /// * `parent_id` - Optional parent post ID for thread typing (pass NULL for regular channel typing)
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_send_typing_indicator(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -1293,6 +1445,10 @@ pub unsafe extern "C" fn communicator_platform_send_typing_indicator(
 /// FFI function: Subscribe to real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -1316,6 +1472,10 @@ pub unsafe extern "C" fn communicator_platform_subscribe_events(handle: Platform
 /// FFI function: Unsubscribe from real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -1341,6 +1501,10 @@ pub unsafe extern "C" fn communicator_platform_unsubscribe_events(handle: Platfo
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL if no events or on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *mut c_char {
     error::clear_last_error();
 
@@ -1539,6 +1703,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_send_reply(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -1616,6 +1784,10 @@ pub unsafe extern "C" fn communicator_platform_send_reply(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_update_message(
     handle: PlatformHandle,
     message_id: *const c_char,
@@ -1680,6 +1852,10 @@ pub unsafe extern "C" fn communicator_platform_update_message(
 /// FFI function: Delete a message
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_delete_message(
     handle: PlatformHandle,
     message_id: *const c_char,
@@ -1718,6 +1894,10 @@ pub unsafe extern "C" fn communicator_platform_delete_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_message(
     handle: PlatformHandle,
     message_id: *const c_char,
@@ -1773,6 +1953,10 @@ pub unsafe extern "C" fn communicator_platform_get_message(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_search_messages(
     handle: PlatformHandle,
     query: *const c_char,
@@ -1829,6 +2013,10 @@ pub unsafe extern "C" fn communicator_platform_search_messages(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_messages_before(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -1896,6 +2084,10 @@ pub unsafe extern "C" fn communicator_platform_get_messages_before(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_messages_after(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -1963,6 +2155,10 @@ pub unsafe extern "C" fn communicator_platform_get_messages_after(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_channel_by_name(
     handle: PlatformHandle,
     team_id: *const c_char,
@@ -2030,6 +2226,10 @@ pub unsafe extern "C" fn communicator_platform_get_channel_by_name(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_create_group_channel(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
@@ -2095,6 +2295,10 @@ pub unsafe extern "C" fn communicator_platform_create_group_channel(
 /// FFI function: Add a user to a channel
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_add_channel_member(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -2142,6 +2346,10 @@ pub unsafe extern "C" fn communicator_platform_add_channel_member(
 /// FFI function: Remove a user from a channel
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_remove_channel_member(
     handle: PlatformHandle,
     channel_id: *const c_char,
@@ -2191,6 +2399,10 @@ pub unsafe extern "C" fn communicator_platform_remove_channel_member(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_user_by_username(
     handle: PlatformHandle,
     username: *const c_char,
@@ -2246,6 +2458,10 @@ pub unsafe extern "C" fn communicator_platform_get_user_by_username(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_user_by_email(
     handle: PlatformHandle,
     email: *const c_char,
@@ -2302,6 +2518,10 @@ pub unsafe extern "C" fn communicator_platform_get_user_by_email(
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_users_by_ids(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
@@ -2373,6 +2593,10 @@ pub unsafe extern "C" fn communicator_platform_get_users_by_ids(
 /// }
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_set_custom_status(
     handle: PlatformHandle,
     custom_status_json: *const c_char,
@@ -2432,6 +2656,10 @@ pub unsafe extern "C" fn communicator_platform_set_custom_status(
 /// FFI function: Remove/clear the current user's custom status
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHandle) -> ErrorCode {
     error::clear_last_error();
 
@@ -2458,6 +2686,10 @@ pub unsafe extern "C" fn communicator_platform_remove_custom_status(handle: Plat
 /// The caller must free the returned string using communicator_free_string()
 /// Returns NULL on error
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_users_status(
     handle: PlatformHandle,
     user_ids_json: *const c_char,
@@ -2545,6 +2777,10 @@ pub unsafe extern "C" fn communicator_platform_get_users_status(
 /// # Safety
 /// The caller must ensure that `handle` and `team_name` are valid pointers
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_get_team_by_name(
     handle: PlatformHandle,
     team_name: *const c_char,
@@ -2601,6 +2837,10 @@ pub unsafe extern "C" fn communicator_platform_get_team_by_name(
 /// The caller must ensure that `handle` is a valid pointer.
 /// If `team_id` is not NULL, it must be a valid C string pointer.
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_set_team_id(
     handle: PlatformHandle,
     team_id: *const c_char,
@@ -2645,6 +2885,10 @@ pub unsafe extern "C" fn communicator_platform_set_team_id(
 /// The caller must ensure that `handle` is a valid pointer that was created by
 /// this library and has not been freed already.
 #[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
 pub unsafe extern "C" fn communicator_platform_destroy(handle: PlatformHandle) {
     if !handle.is_null() {
         let _ = Box::from_raw(handle);
