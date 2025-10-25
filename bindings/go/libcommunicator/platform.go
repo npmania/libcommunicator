@@ -724,6 +724,51 @@ func (p *Platform) RemoveCustomStatus() error {
 	return nil
 }
 
+// SetStatus sets the current user's status
+// Valid status values: "online", "away", "dnd", "offline"
+func (p *Platform) SetStatus(status string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(status)
+	defer free()
+
+	code := C.communicator_platform_set_status(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetUserStatus gets a user's status
+// Returns the status string: "online", "away", "dnd", "offline", or "unknown"
+func (p *Platform) GetUserStatus(userID string) (string, error) {
+	if p.handle == nil {
+		return "", ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(userID)
+	defer free()
+
+	cstr := C.communicator_platform_get_user_status(p.handle, cs)
+	if cstr == nil {
+		return "", getLastError()
+	}
+	defer freeString(cstr)
+
+	// Parse the JSON response: {"status": "online"}
+	var statusResponse struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &statusResponse); err != nil {
+		return "", err
+	}
+
+	return statusResponse.Status, nil
+}
+
 // GetUsersStatus gets status for multiple users (batch operation)
 // Returns a map of user IDs to status strings
 func (p *Platform) GetUsersStatus(userIDs []string) (map[string]string, error) {
@@ -752,6 +797,49 @@ func (p *Platform) GetUsersStatus(userIDs []string) (map[string]string, error) {
 	}
 
 	return statusMap, nil
+}
+
+// GetTeams gets all teams the user belongs to
+func (p *Platform) GetTeams() ([]Team, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cstr := C.communicator_platform_get_teams(p.handle)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var teams []Team
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &teams); err != nil {
+		return nil, err
+	}
+
+	return teams, nil
+}
+
+// GetTeam gets a specific team by ID
+func (p *Platform) GetTeam(teamID string) (*Team, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(teamID)
+	defer free()
+
+	cstr := C.communicator_platform_get_team(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var team Team
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &team); err != nil {
+		return nil, err
+	}
+
+	return &team, nil
 }
 
 // GetTeamByName gets a team by name

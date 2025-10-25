@@ -8,26 +8,35 @@ import (
 
 // EventStream provides a Go-idiomatic way to consume platform events
 type EventStream struct {
-	platform *Platform
-	events   chan *Event
-	errors   chan error
-	done     chan struct{}
-	wg       sync.WaitGroup
-	once     sync.Once
+	platform     *Platform
+	events       chan *Event
+	errors       chan error
+	done         chan struct{}
+	pollInterval time.Duration
+	wg           sync.WaitGroup
+	once         sync.Once
 }
 
 // NewEventStream creates a new event stream for the platform
 // The stream will poll for events in the background and send them to a channel
-func (p *Platform) NewEventStream(ctx context.Context, bufferSize int) (*EventStream, error) {
+// pollInterval specifies how frequently to poll for events (e.g., 100*time.Millisecond)
+// If pollInterval is 0, a default of 100ms is used
+func (p *Platform) NewEventStream(ctx context.Context, bufferSize int, pollInterval time.Duration) (*EventStream, error) {
 	if err := p.SubscribeEvents(); err != nil {
 		return nil, err
 	}
 
+	// Use default poll interval if not specified
+	if pollInterval == 0 {
+		pollInterval = 100 * time.Millisecond
+	}
+
 	stream := &EventStream{
-		platform: p,
-		events:   make(chan *Event, bufferSize),
-		errors:   make(chan error, 10),
-		done:     make(chan struct{}),
+		platform:     p,
+		events:       make(chan *Event, bufferSize),
+		errors:       make(chan error, 10),
+		done:         make(chan struct{}),
+		pollInterval: pollInterval,
 	}
 
 	stream.wg.Add(1)
@@ -52,7 +61,7 @@ func (s *EventStream) poll(ctx context.Context) {
 	defer close(s.events)
 	defer close(s.errors)
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(s.pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -69,6 +78,7 @@ func (s *EventStream) poll(ctx context.Context) {
 				case s.errors <- err:
 				default:
 					// Error channel is full, drop the error
+					// Consider logging this in production use
 				}
 				continue
 			}

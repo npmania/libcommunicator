@@ -87,8 +87,8 @@ func main() {
 		cancel()
 	}()
 
-	// Create event stream
-	stream, err := platform.NewEventStream(ctx, 100)
+	// Create event stream (0 = use default 100ms poll interval)
+	stream, err := platform.NewEventStream(ctx, 100, 0)
 	if err != nil {
 		log.Fatalf("Failed to create event stream: %v", err)
 	}
