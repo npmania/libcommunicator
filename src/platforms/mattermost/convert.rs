@@ -3,7 +3,30 @@ use chrono::{DateTime, Utc};
 use crate::types::user::UserStatus;
 use crate::types::{Attachment, Channel, ChannelType, Message, User};
 
+use super::channels::get_dm_partner_id;
 use super::types::{FileInfo, MattermostChannel, MattermostPost, MattermostUser};
+
+/// Context for converting Mattermost types to generic types
+/// Provides necessary information like server URL and current user ID
+#[derive(Clone)]
+pub struct ConversionContext {
+    pub server_url: String,
+    pub current_user_id: Option<String>,
+}
+
+impl ConversionContext {
+    pub fn new(server_url: String) -> Self {
+        Self {
+            server_url,
+            current_user_id: None,
+        }
+    }
+
+    pub fn with_current_user(mut self, user_id: String) -> Self {
+        self.current_user_id = Some(user_id);
+        self
+    }
+}
 
 /// Convert a Mattermost timestamp (milliseconds since epoch) to DateTime<Utc>
 fn timestamp_to_datetime(timestamp_ms: i64) -> DateTime<Utc> {
@@ -11,46 +34,56 @@ fn timestamp_to_datetime(timestamp_ms: i64) -> DateTime<Utc> {
         .unwrap_or_else(|| Utc::now())
 }
 
-/// Convert Mattermost User to our internal User type
-impl From<MattermostUser> for User {
-    fn from(mm_user: MattermostUser) -> Self {
+impl MattermostUser {
+    /// Convert to User with context for proper URL construction
+    pub fn to_user_with_context(&self, ctx: &ConversionContext) -> User {
         // Determine display name from available fields
-        let display_name = if !mm_user.first_name.is_empty() || !mm_user.last_name.is_empty() {
-            format!("{} {}", mm_user.first_name, mm_user.last_name).trim().to_string()
-        } else if !mm_user.nickname.is_empty() {
-            mm_user.nickname.clone()
+        let display_name = if !self.first_name.is_empty() || !self.last_name.is_empty() {
+            format!("{} {}", self.first_name, self.last_name).trim().to_string()
+        } else if !self.nickname.is_empty() {
+            self.nickname.clone()
         } else {
-            mm_user.username.clone()
+            self.username.clone()
         };
 
         // Create metadata with Mattermost-specific fields
         let metadata = serde_json::json!({
-            "first_name": mm_user.first_name,
-            "last_name": mm_user.last_name,
-            "nickname": mm_user.nickname,
-            "position": mm_user.position,
-            "roles": mm_user.roles,
-            "locale": mm_user.locale,
-            "timezone": mm_user.timezone,
-            "props": mm_user.props,
-            "create_at": mm_user.create_at,
-            "update_at": mm_user.update_at,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "nickname": self.nickname,
+            "position": self.position,
+            "roles": self.roles,
+            "locale": self.locale,
+            "timezone": self.timezone,
+            "props": self.props,
+            "create_at": self.create_at,
+            "update_at": self.update_at,
         });
 
-        let mut user = User::new(mm_user.id, mm_user.username, display_name);
+        let mut user = User::new(self.id.clone(), self.username.clone(), display_name);
 
-        if !mm_user.email.is_empty() {
-            user = user.with_email(mm_user.email);
+        if !self.email.is_empty() {
+            user = user.with_email(self.email.clone());
         }
 
-        // Note: Mattermost doesn't provide avatar URL in the user object directly
-        // You would typically construct it as: {server_url}/api/v4/users/{user_id}/image
+        // Construct avatar URL with server context
+        let avatar_url = format!("{}/api/v4/users/{}/image", ctx.server_url, self.id);
+        user = user.with_avatar(avatar_url);
 
-        if mm_user.is_bot {
+        if self.is_bot {
             user = user.as_bot();
         }
 
         user.with_metadata(metadata)
+    }
+}
+
+/// Convert Mattermost User to our internal User type (without context)
+impl From<MattermostUser> for User {
+    fn from(mm_user: MattermostUser) -> Self {
+        // Use a basic context with empty server URL for backwards compatibility
+        let ctx = ConversionContext::new(String::new());
+        mm_user.to_user_with_context(&ctx)
     }
 }
 
@@ -100,25 +133,23 @@ impl From<MattermostPost> for Message {
     }
 }
 
-/// Convert Mattermost FileInfo to our internal Attachment type
-impl From<FileInfo> for Attachment {
-    fn from(file: FileInfo) -> Self {
-        // Construct the file URL
-        // In a real implementation, you'd need the server URL
-        // Format: {server_url}/api/v4/files/{file_id}
-        let url = format!("/api/v4/files/{}", file.id);
+impl FileInfo {
+    /// Convert to Attachment with context for proper URL construction
+    pub fn to_attachment_with_context(&self, ctx: &ConversionContext) -> Attachment {
+        // Construct the full file URL with server context
+        let url = format!("{}/api/v4/files/{}", ctx.server_url, self.id);
 
         let mut attachment = Attachment::new(
-            file.id,
-            file.name,
-            file.mime_type,
-            file.size as u64,
+            self.id.clone(),
+            self.name.clone(),
+            self.mime_type.clone(),
+            self.size as u64,
             url,
         );
 
         // Add thumbnail if available
-        if file.has_preview_image {
-            let thumbnail_url = format!("/api/v4/files/{}/thumbnail", file.post_id);
+        if self.has_preview_image {
+            let thumbnail_url = format!("{}/api/v4/files/{}/thumbnail", ctx.server_url, self.id);
             attachment = attachment.with_thumbnail(thumbnail_url);
         }
 
@@ -126,11 +157,20 @@ impl From<FileInfo> for Attachment {
     }
 }
 
-/// Convert Mattermost Channel to our internal Channel type
-impl From<MattermostChannel> for Channel {
-    fn from(mm_channel: MattermostChannel) -> Self {
+/// Convert Mattermost FileInfo to our internal Attachment type (without context)
+impl From<FileInfo> for Attachment {
+    fn from(file: FileInfo) -> Self {
+        // Use a basic context with empty server URL for backwards compatibility
+        let ctx = ConversionContext::new(String::new());
+        file.to_attachment_with_context(&ctx)
+    }
+}
+
+impl MattermostChannel {
+    /// Convert to Channel with context for better DM display names
+    pub fn to_channel_with_context(&self, ctx: &ConversionContext) -> Channel {
         // Map Mattermost channel type to our ChannelType
-        let channel_type = match mm_channel.channel_type.as_str() {
+        let channel_type = match self.channel_type.as_str() {
             "O" => ChannelType::Public,
             "P" => ChannelType::Private,
             "D" => ChannelType::DirectMessage,
@@ -138,26 +178,35 @@ impl From<MattermostChannel> for Channel {
             _ => ChannelType::Public, // Default to public if unknown
         };
 
-        let created_at = timestamp_to_datetime(mm_channel.create_at);
-        let last_activity_at = if mm_channel.last_post_at > 0 {
-            Some(timestamp_to_datetime(mm_channel.last_post_at))
+        let created_at = timestamp_to_datetime(self.create_at);
+        let last_activity_at = if self.last_post_at > 0 {
+            Some(timestamp_to_datetime(self.last_post_at))
         } else {
             None
         };
 
         // Create metadata with Mattermost-specific fields
-        let metadata = serde_json::json!({
-            "team_id": mm_channel.team_id,
-            "total_msg_count": mm_channel.total_msg_count,
-            "creator_id": mm_channel.creator_id,
-            "update_at": mm_channel.update_at,
-            "delete_at": mm_channel.delete_at,
+        let mut metadata = serde_json::json!({
+            "team_id": self.team_id,
+            "total_msg_count": self.total_msg_count,
+            "creator_id": self.creator_id,
+            "update_at": self.update_at,
+            "delete_at": self.delete_at,
         });
 
+        // For DM channels, try to extract partner user ID
+        if self.channel_type == "D" {
+            if let Some(ref user_id) = ctx.current_user_id {
+                if let Some(partner_id) = get_dm_partner_id(&self.id, user_id) {
+                    metadata["dm_partner_id"] = serde_json::json!(partner_id);
+                }
+            }
+        }
+
         let mut channel = Channel::new(
-            mm_channel.id,
-            mm_channel.name,
-            mm_channel.display_name,
+            self.id.clone(),
+            self.name.clone(),
+            self.display_name.clone(),
             channel_type,
         );
 
@@ -168,19 +217,28 @@ impl From<MattermostChannel> for Channel {
             channel = channel.with_last_activity(last_activity);
         }
 
-        if !mm_channel.header.is_empty() {
-            channel = channel.with_topic(mm_channel.header);
+        if !self.header.is_empty() {
+            channel = channel.with_topic(self.header.clone());
         }
 
-        if !mm_channel.purpose.is_empty() {
-            channel = channel.with_purpose(mm_channel.purpose);
+        if !self.purpose.is_empty() {
+            channel = channel.with_purpose(self.purpose.clone());
         }
 
-        if mm_channel.delete_at > 0 {
+        if self.delete_at > 0 {
             channel = channel.archived();
         }
 
         channel.with_metadata(metadata)
+    }
+}
+
+/// Convert Mattermost Channel to our internal Channel type (without context)
+impl From<MattermostChannel> for Channel {
+    fn from(mm_channel: MattermostChannel) -> Self {
+        // Use a basic context with empty server URL for backwards compatibility
+        let ctx = ConversionContext::new(String::new());
+        mm_channel.to_channel_with_context(&ctx)
     }
 }
 
