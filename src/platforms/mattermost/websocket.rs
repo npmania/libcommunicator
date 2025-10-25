@@ -23,16 +23,34 @@ pub enum ConnectionState {
     ShuttingDown,
 }
 
+/// Configuration for WebSocket connection
+#[derive(Debug, Clone)]
+pub struct WebSocketConfig {
+    /// Maximum number of events to queue (default: 1000)
+    /// When full, oldest events are dropped
+    pub max_queue_size: usize,
+}
+
+impl Default for WebSocketConfig {
+    fn default() -> Self {
+        Self {
+            max_queue_size: 1000,
+        }
+    }
+}
+
 /// WebSocket connection manager for Mattermost
 pub struct WebSocketManager {
     /// URL for the WebSocket connection
     ws_url: String,
     /// Authentication token
     token: String,
+    /// Configuration
+    config: WebSocketConfig,
     /// Event sender (for internal use)
-    event_tx: mpsc::UnboundedSender<PlatformEvent>,
+    event_tx: mpsc::Sender<PlatformEvent>,
     /// Event receiver for polling events
-    event_rx: Arc<Mutex<mpsc::UnboundedReceiver<PlatformEvent>>>,
+    event_rx: Arc<Mutex<mpsc::Receiver<PlatformEvent>>>,
     /// Shutdown signal sender
     shutdown_tx: Option<mpsc::Sender<()>>,
     /// Sequence number for WebSocket messages
@@ -42,24 +60,35 @@ pub struct WebSocketManager {
 }
 
 impl WebSocketManager {
-    /// Create a new WebSocket manager
+    /// Create a new WebSocket manager with default configuration
     ///
     /// # Arguments
     /// * `base_url` - The base URL of the Mattermost server
     /// * `token` - Authentication token for WebSocket authentication
     pub fn new(base_url: &str, token: String) -> Self {
+        Self::with_config(base_url, token, WebSocketConfig::default())
+    }
+
+    /// Create a new WebSocket manager with custom configuration
+    ///
+    /// # Arguments
+    /// * `base_url` - The base URL of the Mattermost server
+    /// * `token` - Authentication token for WebSocket authentication
+    /// * `config` - WebSocket configuration
+    pub fn with_config(base_url: &str, token: String, config: WebSocketConfig) -> Self {
         // Convert HTTP(S) URL to WebSocket URL
         let ws_url = base_url
             .replace("https://", "wss://")
             .replace("http://", "ws://");
         let ws_url = format!("{}/api/v4/websocket", ws_url);
 
-        // Create unbounded channel for events
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        // Create bounded channel for events with configured size
+        let (event_tx, event_rx) = mpsc::channel(config.max_queue_size);
 
         Self {
             ws_url,
             token,
+            config,
             event_tx,
             event_rx: Arc::new(Mutex::new(event_rx)),
             shutdown_tx: None,
@@ -180,14 +209,23 @@ impl WebSocketManager {
     }
 
     /// Handle an incoming WebSocket message
-    async fn handle_message(text: String, event_tx: &mpsc::UnboundedSender<PlatformEvent>) -> Result<()> {
+    async fn handle_message(text: String, event_tx: &mpsc::Sender<PlatformEvent>) -> Result<()> {
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
             .map_err(|e| Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e)))?;
 
         // Convert WebSocket event to PlatformEvent
         if let Some(platform_event) = Self::convert_event(ws_event) {
-            // Send event to channel (ignoring send errors if receiver is dropped)
-            let _ = event_tx.send(platform_event);
+            // Try to send event to channel
+            // If full, log warning and drop the event (non-blocking)
+            match event_tx.try_send(platform_event) {
+                Ok(_) => {} // Event sent successfully
+                Err(mpsc::error::TrySendError::Full(event)) => {
+                    eprintln!("WARNING: Event queue is full, dropping event: {:?}", event);
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    // Receiver dropped, silently ignore
+                }
+            }
         }
 
         Ok(())
@@ -399,13 +437,49 @@ mod tests {
         manager.event_tx.send(PlatformEvent::MessageDeleted {
             message_id: "msg123".to_string(),
             channel_id: "ch456".to_string(),
-        }).unwrap();
+        }).await.unwrap();
 
         // Poll event
         let event = manager.poll_event().await;
         assert!(event.is_some());
 
         // Queue should be empty again
+        assert!(manager.poll_event().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_event_queue_overflow() {
+        // Create manager with small queue size
+        let config = WebSocketConfig { max_queue_size: 2 };
+        let manager = WebSocketManager::with_config(
+            "https://mattermost.example.com",
+            "token".to_string(),
+            config,
+        );
+
+        // Fill the queue
+        manager.event_tx.send(PlatformEvent::MessageDeleted {
+            message_id: "msg1".to_string(),
+            channel_id: "ch1".to_string(),
+        }).await.unwrap();
+
+        manager.event_tx.send(PlatformEvent::MessageDeleted {
+            message_id: "msg2".to_string(),
+            channel_id: "ch2".to_string(),
+        }).await.unwrap();
+
+        // Queue is now full, try_send should fail
+        let result = manager.event_tx.try_send(PlatformEvent::MessageDeleted {
+            message_id: "msg3".to_string(),
+            channel_id: "ch3".to_string(),
+        });
+
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), mpsc::error::TrySendError::Full(_)));
+
+        // But we should still be able to receive the first two
+        assert!(manager.poll_event().await.is_some());
+        assert!(manager.poll_event().await.is_some());
         assert!(manager.poll_event().await.is_none());
     }
 
