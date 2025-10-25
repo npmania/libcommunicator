@@ -1,4 +1,4 @@
-use futures::{stream::{SplitSink, SplitStream}, SinkExt, StreamExt};
+use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio::net::TcpStream;
@@ -11,8 +11,6 @@ use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, We
 
 /// Type alias for the WebSocket write half
 type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
-/// Type alias for the WebSocket read half
-type WsReader = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 /// WebSocket connection state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,17 +157,18 @@ impl WebSocketManager {
         *self.connection_state.lock().await = state;
     }
 
-    /// Calculate exponential backoff delay in milliseconds
+    /// Calculate exponential backoff delay in milliseconds (static helper)
     ///
     /// # Arguments
+    /// * `config` - WebSocket configuration
     /// * `attempt` - Current reconnection attempt number (0-based)
     ///
     /// # Returns
     /// Delay in milliseconds, capped at max_reconnect_delay_ms
-    fn calculate_backoff_delay(&self, attempt: u32) -> u64 {
-        let initial = self.config.initial_reconnect_delay_ms as f64;
-        let multiplier = self.config.reconnect_backoff_multiplier;
-        let max = self.config.max_reconnect_delay_ms;
+    fn calculate_backoff_delay_static(config: &WebSocketConfig, attempt: u32) -> u64 {
+        let initial = config.initial_reconnect_delay_ms as f64;
+        let multiplier = config.reconnect_backoff_multiplier;
+        let max = config.max_reconnect_delay_ms;
 
         // Calculate: initial_delay * (multiplier ^ attempt)
         let delay = initial * multiplier.powi(attempt as i32);
@@ -181,13 +180,6 @@ impl WebSocketManager {
     /// Reset reconnection attempt counter
     async fn reset_reconnect_attempts(&self) {
         *self.reconnect_attempts.lock().await = 0;
-    }
-
-    /// Increment and get reconnection attempt counter
-    async fn increment_reconnect_attempts(&self) -> u32 {
-        let mut attempts = self.reconnect_attempts.lock().await;
-        *attempts += 1;
-        *attempts
     }
 
     /// Send a WebSocket message
@@ -369,8 +361,10 @@ impl WebSocketManager {
                 // Reconnection loop with exponential backoff
                 loop {
                     // Get current attempt count
-                    let mut attempts = reconnect_attempts.lock().await;
-                    let attempt_num = *attempts;
+                    let attempt_num = {
+                        let attempts = reconnect_attempts.lock().await;
+                        *attempts
+                    };
 
                     // Check if we've exceeded max attempts
                     if let Some(max_attempts) = config.max_reconnect_attempts {
@@ -381,17 +375,20 @@ impl WebSocketManager {
                         }
                     }
 
-                    *attempts += 1;
-                    drop(attempts); // Release lock before sleeping
+                    // Increment reconnect attempts
+                    {
+                        let mut attempts = reconnect_attempts.lock().await;
+                        *attempts += 1;
+                    }
 
                     // Set state to Reconnecting
                     *connection_state.lock().await = ConnectionState::Reconnecting;
 
-                    // Calculate backoff delay
-                    let initial = config.initial_reconnect_delay_ms as f64;
-                    let multiplier = config.reconnect_backoff_multiplier;
-                    let max_delay = config.max_reconnect_delay_ms;
-                    let delay = (initial * multiplier.powi(attempt_num as i32)).min(max_delay as f64) as u64;
+                    // Calculate backoff delay using the WebSocketManager method
+                    // We need to create a temporary manager instance to access the method
+                    // Actually, we can't access `self` here, so we'll use inline calculation
+                    // But we should refactor calculate_backoff_delay to be a static method
+                    let delay = Self::calculate_backoff_delay_static(&config, attempt_num);
 
                     println!("WebSocket disconnected. Attempting reconnection {} in {} ms...", attempt_num + 1, delay);
                     tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
@@ -907,6 +904,13 @@ impl WebSocketManager {
 
     /// Disconnect from the WebSocket
     pub async fn disconnect(&mut self) {
+        // Check current state before disconnecting
+        let current_state = self.get_connection_state().await;
+        if current_state == ConnectionState::ShuttingDown || current_state == ConnectionState::Disconnected {
+            // Already disconnecting or disconnected
+            return;
+        }
+
         self.set_connection_state(ConnectionState::ShuttingDown).await;
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(()).await;
@@ -1101,21 +1105,16 @@ mod tests {
     #[test]
     fn test_backoff_delay_calculation() {
         let config = WebSocketConfig::default();
-        let manager = WebSocketManager::with_config(
-            "https://mattermost.example.com",
-            "token".to_string(),
-            config,
-        );
 
         // Test exponential backoff: delay = initial * (multiplier ^ attempt)
-        assert_eq!(manager.calculate_backoff_delay(0), 1000);   // 1000 * 2^0 = 1000ms
-        assert_eq!(manager.calculate_backoff_delay(1), 2000);   // 1000 * 2^1 = 2000ms
-        assert_eq!(manager.calculate_backoff_delay(2), 4000);   // 1000 * 2^2 = 4000ms
-        assert_eq!(manager.calculate_backoff_delay(3), 8000);   // 1000 * 2^3 = 8000ms
-        assert_eq!(manager.calculate_backoff_delay(4), 16000);  // 1000 * 2^4 = 16000ms
-        assert_eq!(manager.calculate_backoff_delay(5), 32000);  // 1000 * 2^5 = 32000ms
-        assert_eq!(manager.calculate_backoff_delay(6), 60000);  // Capped at max (60000ms)
-        assert_eq!(manager.calculate_backoff_delay(10), 60000); // Still capped
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 0), 1000);   // 1000 * 2^0 = 1000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 1), 2000);   // 1000 * 2^1 = 2000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 2), 4000);   // 1000 * 2^2 = 4000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 3), 8000);   // 1000 * 2^3 = 8000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 4), 16000);  // 1000 * 2^4 = 16000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 5), 32000);  // 1000 * 2^5 = 32000ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 6), 60000);  // Capped at max (60000ms)
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 10), 60000); // Still capped
     }
 
     #[test]
@@ -1129,18 +1128,13 @@ mod tests {
             max_reconnect_delay_ms: 10000,
             reconnect_backoff_multiplier: 1.5,
         };
-        let manager = WebSocketManager::with_config(
-            "https://mattermost.example.com",
-            "token".to_string(),
-            config,
-        );
 
         // Test with multiplier 1.5
-        assert_eq!(manager.calculate_backoff_delay(0), 500);   // 500 * 1.5^0 = 500ms
-        assert_eq!(manager.calculate_backoff_delay(1), 750);   // 500 * 1.5^1 = 750ms
-        assert_eq!(manager.calculate_backoff_delay(2), 1125);  // 500 * 1.5^2 = 1125ms
-        assert_eq!(manager.calculate_backoff_delay(3), 1687);  // 500 * 1.5^3 = 1687ms
-        assert_eq!(manager.calculate_backoff_delay(10), 10000); // Capped at max
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 0), 500);   // 500 * 1.5^0 = 500ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 1), 750);   // 500 * 1.5^1 = 750ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 2), 1125);  // 500 * 1.5^2 = 1125ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 3), 1687);  // 500 * 1.5^3 = 1687ms
+        assert_eq!(WebSocketManager::calculate_backoff_delay_static(&config, 10), 10000); // Capped at max
     }
 
     #[tokio::test]
@@ -1150,19 +1144,21 @@ mod tests {
         // Should start at 0
         assert_eq!(*manager.reconnect_attempts.lock().await, 0);
 
-        // Increment
-        let count1 = manager.increment_reconnect_attempts().await;
-        assert_eq!(count1, 1);
-        assert_eq!(*manager.reconnect_attempts.lock().await, 1);
-
-        // Increment again
-        let count2 = manager.increment_reconnect_attempts().await;
-        assert_eq!(count2, 2);
-        assert_eq!(*manager.reconnect_attempts.lock().await, 2);
-
         // Reset
         manager.reset_reconnect_attempts().await;
         assert_eq!(*manager.reconnect_attempts.lock().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_connection_state_query() {
+        let manager = WebSocketManager::new("https://mattermost.example.com", "token".to_string());
+
+        // Should start in Disconnected state
+        assert_eq!(manager.get_connection_state().await, ConnectionState::Disconnected);
+
+        // Verify the public API method works
+        let state = manager.get_connection_state().await;
+        assert!(matches!(state, ConnectionState::Disconnected));
     }
 
     #[test]
