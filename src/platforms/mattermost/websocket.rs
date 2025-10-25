@@ -29,8 +29,10 @@ pub struct WebSocketManager {
     ws_url: String,
     /// Authentication token
     token: String,
-    /// Event queue for received events
-    event_queue: Arc<Mutex<Vec<PlatformEvent>>>,
+    /// Event sender (for internal use)
+    event_tx: mpsc::UnboundedSender<PlatformEvent>,
+    /// Event receiver for polling events
+    event_rx: Arc<Mutex<mpsc::UnboundedReceiver<PlatformEvent>>>,
     /// Shutdown signal sender
     shutdown_tx: Option<mpsc::Sender<()>>,
     /// Sequence number for WebSocket messages
@@ -52,10 +54,14 @@ impl WebSocketManager {
             .replace("http://", "ws://");
         let ws_url = format!("{}/api/v4/websocket", ws_url);
 
+        // Create unbounded channel for events
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+
         Self {
             ws_url,
             token,
-            event_queue: Arc::new(Mutex::new(Vec::new())),
+            event_tx,
+            event_rx: Arc::new(Mutex::new(event_rx)),
             shutdown_tx: None,
             seq_number: Arc::new(Mutex::new(1)),
             connection_state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
@@ -123,8 +129,8 @@ impl WebSocketManager {
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
         self.shutdown_tx = Some(shutdown_tx);
 
-        // Clone Arc references for the spawned task
-        let event_queue = Arc::clone(&self.event_queue);
+        // Clone references for the spawned task
+        let event_tx = self.event_tx.clone();
         let connection_state = Arc::clone(&self.connection_state);
 
         // Spawn a task to handle incoming messages
@@ -135,7 +141,7 @@ impl WebSocketManager {
                     msg = read.next() => {
                         match msg {
                             Some(Ok(Message::Text(text))) => {
-                                if let Err(e) = Self::handle_message(text, &event_queue).await {
+                                if let Err(e) = Self::handle_message(text, &event_tx).await {
                                     eprintln!("Error handling WebSocket message: {}", e);
                                 }
                             }
@@ -174,14 +180,14 @@ impl WebSocketManager {
     }
 
     /// Handle an incoming WebSocket message
-    async fn handle_message(text: String, event_queue: &Arc<Mutex<Vec<PlatformEvent>>>) -> Result<()> {
+    async fn handle_message(text: String, event_tx: &mpsc::UnboundedSender<PlatformEvent>) -> Result<()> {
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
             .map_err(|e| Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e)))?;
 
         // Convert WebSocket event to PlatformEvent
         if let Some(platform_event) = Self::convert_event(ws_event) {
-            let mut queue = event_queue.lock().await;
-            queue.push(platform_event);
+            // Send event to channel (ignoring send errors if receiver is dropped)
+            let _ = event_tx.send(platform_event);
         }
 
         Ok(())
@@ -346,12 +352,8 @@ impl WebSocketManager {
     /// # Returns
     /// An Option containing the next PlatformEvent, or None if the queue is empty
     pub async fn poll_event(&self) -> Option<PlatformEvent> {
-        let mut queue = self.event_queue.lock().await;
-        if !queue.is_empty() {
-            Some(queue.remove(0))
-        } else {
-            None
-        }
+        let mut rx = self.event_rx.lock().await;
+        rx.try_recv().ok()
     }
 
     /// Disconnect from the WebSocket
@@ -393,14 +395,11 @@ mod tests {
         // Initially empty - poll should return None
         assert!(manager.poll_event().await.is_none());
 
-        // Add an event manually
-        {
-            let mut queue = manager.event_queue.lock().await;
-            queue.push(PlatformEvent::MessageDeleted {
-                message_id: "msg123".to_string(),
-                channel_id: "ch456".to_string(),
-            });
-        }
+        // Send an event through the channel
+        manager.event_tx.send(PlatformEvent::MessageDeleted {
+            message_id: "msg123".to_string(),
+            channel_id: "ch456".to_string(),
+        }).unwrap();
 
         // Poll event
         let event = manager.poll_event().await;
