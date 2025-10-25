@@ -41,6 +41,26 @@ type Channel struct {
 	TeamID      string      `json:"team_id,omitempty"`
 }
 
+// TeamType represents the type/visibility of a team
+type TeamType string
+
+const (
+	TeamTypeOpen   TeamType = "open"
+	TeamTypeInvite TeamType = "invite"
+)
+
+// Team represents a team/workspace on the platform
+type Team struct {
+	ID              string      `json:"id"`
+	Name            string      `json:"name"`
+	DisplayName     string      `json:"display_name"`
+	Description     string      `json:"description,omitempty"`
+	TeamType        TeamType    `json:"team_type"`
+	AllowedDomains  string      `json:"allowed_domains,omitempty"`
+	AllowOpenInvite bool        `json:"allow_open_invite"`
+	Metadata        interface{} `json:"metadata,omitempty"`
+}
+
 // Attachment represents a file attachment
 type Attachment struct {
 	ID       string `json:"id"`
