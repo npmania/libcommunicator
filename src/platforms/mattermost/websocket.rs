@@ -6,7 +6,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::PlatformEvent;
 
-use super::types::{WebSocketAuthChallenge, WebSocketAuthData, WebSocketEvent};
+use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, WebSocketAuthData, WebSocketEvent};
 
 /// WebSocket connection manager for Mattermost
 pub struct WebSocketManager {
@@ -143,14 +143,29 @@ impl WebSocketManager {
     fn convert_event(ws_event: WebSocketEvent) -> Option<PlatformEvent> {
         match ws_event.event.as_str() {
             "posted" => {
-                // For MessagePosted, we would need to parse the full post data
-                // For now, we'll return None since we need the full Message object
-                // In a complete implementation, you would deserialize the post data
-                // and convert it to a Message
+                // Extract and deserialize the post data from the event
+                if let Some(post_data) = ws_event.data.get("post") {
+                    if let Ok(post_str) = serde_json::to_string(post_data) {
+                        if let Ok(post) = serde_json::from_str::<MattermostPost>(&post_str) {
+                            let message = post.into();
+                            return Some(PlatformEvent::MessagePosted(message));
+                        }
+                    }
+                }
+                eprintln!("Failed to parse 'posted' event data");
                 None
             }
             "post_edited" => {
-                // For MessageUpdated, we would need the full message
+                // Extract and deserialize the post data for the edited message
+                if let Some(post_data) = ws_event.data.get("post") {
+                    if let Ok(post_str) = serde_json::to_string(post_data) {
+                        if let Ok(post) = serde_json::from_str::<MattermostPost>(&post_str) {
+                            let message = post.into();
+                            return Some(PlatformEvent::MessageUpdated(message));
+                        }
+                    }
+                }
+                eprintln!("Failed to parse 'post_edited' event data");
                 None
             }
             "post_deleted" => {
@@ -186,8 +201,20 @@ impl WebSocketManager {
                 channel_id: ws_event.broadcast.channel_id,
             }),
             "channel_created" => {
-                // For ChannelCreated, we need the full Channel object
-                // For now return None - would need to fetch channel details
+                // Extract and deserialize the channel data from the event
+                if let Some(channel_data) = ws_event.data.get("channel") {
+                    if let Ok(channel_str) = serde_json::to_string(channel_data) {
+                        if let Ok(channel) = serde_json::from_str::<MattermostChannel>(&channel_str) {
+                            let channel = channel.into();
+                            return Some(PlatformEvent::ChannelCreated(channel));
+                        }
+                    }
+                }
+                // Fallback: if we can't parse the full channel, at least notify about the channel ID
+                if !ws_event.broadcast.channel_id.is_empty() {
+                    eprintln!("Failed to parse 'channel_created' event data, but channel ID available: {}",
+                              ws_event.broadcast.channel_id);
+                }
                 None
             }
             "channel_deleted" => {
@@ -196,8 +223,16 @@ impl WebSocketManager {
                 })
             }
             "channel_updated" => {
-                // For ChannelUpdated, we need the full Channel object
-                // For now return None - would need to fetch channel details
+                // Extract and deserialize the channel data from the event
+                if let Some(channel_data) = ws_event.data.get("channel") {
+                    if let Ok(channel_str) = serde_json::to_string(channel_data) {
+                        if let Ok(channel) = serde_json::from_str::<MattermostChannel>(&channel_str) {
+                            let channel = channel.into();
+                            return Some(PlatformEvent::ChannelUpdated(channel));
+                        }
+                    }
+                }
+                eprintln!("Failed to parse 'channel_updated' event data");
                 None
             }
             "status_change" => {
