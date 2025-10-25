@@ -84,32 +84,9 @@ int main(void) {
     printf("\n");
 
     // ========================================================================
-    // Pattern 3: Error Handling
+    // Pattern 3: Opaque Handles (Context Management)
     // ========================================================================
-    printf("3. Error Handling Pattern\n");
-    printf("----------------------------------\n");
-
-    // Intentionally trigger an error by passing NULL
-    char* result = communicator_greet(NULL);
-    if (result == NULL) {
-        printf("  ✓ Successfully caught error:\n");
-        print_error("greeting with NULL");
-    }
-    printf("\n");
-
-    // Clear error and test successful call
-    communicator_clear_error();
-    result = communicator_greet("World");
-    if (result != NULL) {
-        printf("  ✓ Successful call: %s\n", result);
-        communicator_free_string(result);
-    }
-    printf("\n");
-
-    // ========================================================================
-    // Pattern 4: Opaque Handles (Context Management)
-    // ========================================================================
-    printf("4. Opaque Handle Pattern\n");
+    printf("3. Opaque Handle Pattern\n");
     printf("----------------------------------\n");
 
     // Create a context

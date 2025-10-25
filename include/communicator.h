@@ -237,15 +237,6 @@ CommunicatorErrorCode communicator_context_clear_log_callback(CommunicatorContex
 // ============================================================================
 
 /**
- * Get a greeting message from libcommunicator (example function)
- *
- * @param name The name to greet
- * @return A dynamically allocated string that must be freed with communicator_free_string()
- *         Returns NULL on error
- */
-char* communicator_greet(const char* name);
-
-/**
  * Free a string allocated by libcommunicator
  *
  * @param s The string to free

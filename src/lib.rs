@@ -23,47 +23,6 @@ pub const VERSION_STRING: &str = concat!(
     " (libcommunicator)"
 );
 
-/// Internal Rust function
-pub fn greet(name: &str) -> String {
-    format!("Hello from libcommunicator, {}!", name)
-}
-
-/// FFI function: Get a greeting message
-/// The caller must free the returned string using communicator_free_string
-/// Returns NULL on error; use communicator_last_error_* to get error details
-#[no_mangle]
-pub extern "C" fn communicator_greet(name: *const c_char) -> *mut c_char {
-    error::clear_last_error();
-
-    if name.is_null() {
-        error::set_last_error(Error::null_pointer());
-        return std::ptr::null_mut();
-    }
-
-    let name_str = unsafe {
-        match std::ffi::CStr::from_ptr(name).to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                error::set_last_error(Error::invalid_utf8());
-                return std::ptr::null_mut();
-            }
-        }
-    };
-
-    let greeting = greet(name_str);
-
-    match CString::new(greeting) {
-        Ok(c_string) => c_string.into_raw(),
-        Err(_) => {
-            error::set_last_error(Error::new(
-                ErrorCode::OutOfMemory,
-                "Failed to allocate string",
-            ));
-            std::ptr::null_mut()
-        }
-    }
-}
-
 /// FFI function: Free a string allocated by this library
 #[no_mangle]
 pub extern "C" fn communicator_free_string(s: *mut c_char) {
@@ -1235,13 +1194,3 @@ pub extern "C" fn communicator_platform_destroy(handle: PlatformHandle) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_greet() {
-        let result = greet("World");
-        assert_eq!(result, "Hello from libcommunicator, World!");
-    }
-}

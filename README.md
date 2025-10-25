@@ -21,20 +21,4 @@ cargo test
 
 ## FFI Example
 
-See `include/communicator.h` for the C API.
-
-Basic usage from C:
-
-```c
-#include "communicator.h"
-#include <stdio.h>
-
-int main() {
-    char* greeting = communicator_greet("World");
-    if (greeting) {
-        printf("%s\n", greeting);
-        communicator_free_string(greeting);
-    }
-    return 0;
-}
-```
+See `include/communicator.h` for the C API and `examples/` directory for usage examples.
