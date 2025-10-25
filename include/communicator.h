@@ -252,6 +252,211 @@ char* communicator_greet(const char* name);
  */
 void communicator_free_string(char* s);
 
+// ============================================================================
+// Platform API - Mattermost Integration
+// ============================================================================
+
+/**
+ * Opaque handle to a Platform object
+ */
+typedef void* CommunicatorPlatform;
+
+/**
+ * Create a new Mattermost platform instance
+ *
+ * @param server_url The Mattermost server URL (e.g., "https://mattermost.example.com")
+ * @return An opaque handle to the platform, or NULL on error
+ *         Must be freed with communicator_platform_destroy()
+ */
+CommunicatorPlatform communicator_mattermost_create(const char* server_url);
+
+/**
+ * Connect to a platform and authenticate
+ *
+ * @param platform The platform handle
+ * @param config_json JSON configuration string with format:
+ *                    {
+ *                      "server": "https://mattermost.example.com",
+ *                      "credentials": {
+ *                        "token": "xxx" OR "login_id": "user@example.com", "password": "xxx"
+ *                      },
+ *                      "team_id": "optional-team-id"
+ *                    }
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_connect(
+    CommunicatorPlatform platform,
+    const char* config_json
+);
+
+/**
+ * Disconnect from a platform
+ *
+ * @param platform The platform handle
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_disconnect(CommunicatorPlatform platform);
+
+/**
+ * Check if platform is connected
+ *
+ * @param platform The platform handle
+ * @return 1 if connected, 0 if not, -1 on error
+ */
+int communicator_platform_is_connected(CommunicatorPlatform platform);
+
+/**
+ * Get connection info as JSON
+ *
+ * @param platform The platform handle
+ * @return A dynamically allocated JSON string that must be freed with communicator_free_string()
+ *         Returns NULL on error or if not connected
+ */
+char* communicator_platform_get_connection_info(CommunicatorPlatform platform);
+
+/**
+ * Send a message to a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to send the message to
+ * @param text The message text
+ * @return A JSON string representing the created Message
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_send_message(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* text
+);
+
+/**
+ * Get all channels for the current user
+ *
+ * @param platform The platform handle
+ * @return A JSON array string of Channel objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_channels(CommunicatorPlatform platform);
+
+/**
+ * Get a specific channel by ID
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @return A JSON string representing the Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Get recent messages from a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param limit Maximum number of messages to retrieve
+ * @return A JSON array string of Message objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_messages(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    uint32_t limit
+);
+
+/**
+ * Get members of a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @return A JSON array string of User objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_channel_members(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Get a specific user by ID
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @return A JSON string representing the User
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user(
+    CommunicatorPlatform platform,
+    const char* user_id
+);
+
+/**
+ * Get the current authenticated user
+ *
+ * @param platform The platform handle
+ * @return A JSON string representing the User
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_current_user(CommunicatorPlatform platform);
+
+/**
+ * Create a direct message channel with another user
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID to create a DM channel with
+ * @return A JSON string representing the created Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_create_direct_channel(
+    CommunicatorPlatform platform,
+    const char* user_id
+);
+
+/**
+ * Subscribe to real-time events
+ *
+ * @param platform The platform handle
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_subscribe_events(CommunicatorPlatform platform);
+
+/**
+ * Unsubscribe from real-time events
+ *
+ * @param platform The platform handle
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_unsubscribe_events(CommunicatorPlatform platform);
+
+/**
+ * Poll for the next event
+ *
+ * @param platform The platform handle
+ * @return A JSON string representing the PlatformEvent, or NULL if no events are available
+ *         Event format: { "type": "event_type", "data": {...} }
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL if no events or on error
+ */
+char* communicator_platform_poll_event(CommunicatorPlatform platform);
+
+/**
+ * Destroy a platform and free its memory
+ * After calling this, the handle is invalid and must not be used
+ *
+ * @param platform The platform handle
+ */
+void communicator_platform_destroy(CommunicatorPlatform platform);
+
 #ifdef __cplusplus
 }
 #endif

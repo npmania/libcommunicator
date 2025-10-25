@@ -30,7 +30,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 # Targets
-all: version_example ffi_patterns_demo
+all: version_example ffi_patterns_demo mattermost_demo
 
 version_example: version_example.c
 	@echo "Building $@..."
@@ -50,7 +50,16 @@ ffi_patterns_demo: ffi_patterns_demo.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 	@echo "Done! Run with: ./ffi_patterns_demo"
 
+mattermost_demo: mattermost_demo.c
+	@echo "Building $@..."
+	@if [ ! -f "$(LIB_DIR)/$(LIB_NAME)" ]; then \
+		echo "Error: Library not found. Please run 'cargo build --release' first."; \
+		exit 1; \
+	fi
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "Done! Run with: ./mattermost_demo <server_url> <login_id_or_token> <password_or_empty> <team_id>"
+
 clean:
-	rm -f version_example ffi_patterns_demo
+	rm -f version_example ffi_patterns_demo mattermost_demo
 
 .PHONY: all clean
