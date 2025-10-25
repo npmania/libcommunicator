@@ -117,12 +117,14 @@ impl WebSocketManager {
     ///
     /// # Arguments
     /// * `channel_id` - The channel to send typing indicator to
-    pub async fn send_typing_indicator(&self, channel_id: &str) -> Result<()> {
+    /// * `parent_id` - Optional parent post ID for thread typing indicators
+    pub async fn send_typing_indicator(&self, channel_id: &str, parent_id: Option<&str>) -> Result<()> {
         let action = serde_json::json!({
             "action": "user_typing",
             "seq": self.next_seq().await,
             "data": {
                 "channel_id": channel_id,
+                "parent_id": parent_id.unwrap_or(""),
             }
         });
 

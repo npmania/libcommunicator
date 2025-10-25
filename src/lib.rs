@@ -1224,6 +1224,69 @@ pub extern "C" fn communicator_platform_get_user_status(
     }
 }
 
+/// FFI function: Send typing indicator to a channel
+/// Returns ErrorCode indicating success or failure
+///
+/// # Arguments
+/// * `handle` - Platform handle
+/// * `channel_id` - The channel ID to send typing indicator to
+/// * `parent_id` - Optional parent post ID for thread typing (pass NULL for regular channel typing)
+#[no_mangle]
+pub extern "C" fn communicator_platform_send_typing_indicator(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    parent_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    // parent_id is optional - NULL is allowed
+    let parent_id_str = if parent_id.is_null() {
+        None
+    } else {
+        unsafe {
+            match std::ffi::CStr::from_ptr(parent_id).to_str() {
+                Ok(s) => {
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s)
+                    }
+                }
+                Err(_) => {
+                    error::set_last_error(Error::invalid_utf8());
+                    return ErrorCode::InvalidUtf8;
+                }
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.send_typing_indicator(channel_id_str, parent_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
 /// FFI function: Subscribe to real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]

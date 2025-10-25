@@ -275,6 +275,18 @@ impl Platform for MattermostPlatform {
         Ok(super::status_string_to_user_status(&mm_status.status))
     }
 
+    async fn send_typing_indicator(&self, channel_id: &str, parent_id: Option<&str>) -> Result<()> {
+        let ws_lock = self.websocket.lock().await;
+        if let Some(ws) = ws_lock.as_ref() {
+            ws.send_typing_indicator(channel_id, parent_id).await
+        } else {
+            Err(Error::new(
+                ErrorCode::InvalidState,
+                "WebSocket not connected - cannot send typing indicator. Call subscribe_events() first.",
+            ))
+        }
+    }
+
     async fn subscribe_events(&mut self) -> Result<()> {
         let token = self.client.get_token().await.ok_or_else(|| {
             Error::new(

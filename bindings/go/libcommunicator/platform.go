@@ -769,6 +769,32 @@ func (p *Platform) GetUserStatus(userID string) (string, error) {
 	return statusResponse.Status, nil
 }
 
+// SendTypingIndicator sends a typing indicator to a channel
+// For regular channel typing, pass empty string for parentID
+// For thread typing, pass the parent post ID
+func (p *Platform) SendTypingIndicator(channelID string, parentID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csChannelID, freeChannel := cStringFree(channelID)
+	defer freeChannel()
+
+	var csParentID *C.char
+	var freeParent func()
+	if parentID != "" {
+		csParentID, freeParent = cStringFree(parentID)
+		defer freeParent()
+	}
+
+	code := C.communicator_platform_send_typing_indicator(p.handle, csChannelID, csParentID)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
 // GetUsersStatus gets status for multiple users (batch operation)
 // Returns a map of user IDs to status strings
 func (p *Platform) GetUsersStatus(userIDs []string) (map[string]string, error) {

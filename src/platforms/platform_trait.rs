@@ -445,6 +445,21 @@ pub trait Platform: Send + Sync {
         Err(crate::error::Error::unsupported("Batch user status not supported by this platform"))
     }
 
+    /// Send a typing indicator to a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel to send typing indicator to
+    /// * `parent_id` - Optional parent post ID for thread typing indicators
+    ///
+    /// # Notes
+    /// Not all platforms support typing indicators. This is a best-effort operation
+    /// that may fail silently on platforms without typing indicator support.
+    /// Typing indicators are typically short-lived (cleared after a few seconds of no activity).
+    async fn send_typing_indicator(&self, channel_id: &str, parent_id: Option<&str>) -> Result<()> {
+        let _ = (channel_id, parent_id);
+        Err(crate::error::Error::unsupported("Typing indicators not supported by this platform"))
+    }
+
     /// Get a team by name
     ///
     /// # Arguments
