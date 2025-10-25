@@ -1424,6 +1424,76 @@ pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *m
                         "state": state
                     })
                 }
+                PlatformEvent::ReactionAdded { message_id, user_id, emoji_name, channel_id } => {
+                    serde_json::json!({
+                        "type": "reaction_added",
+                        "message_id": message_id,
+                        "user_id": user_id,
+                        "emoji_name": emoji_name,
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::ReactionRemoved { message_id, user_id, emoji_name, channel_id } => {
+                    serde_json::json!({
+                        "type": "reaction_removed",
+                        "message_id": message_id,
+                        "user_id": user_id,
+                        "emoji_name": emoji_name,
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::DirectChannelAdded { channel_id } => {
+                    serde_json::json!({
+                        "type": "direct_channel_added",
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::GroupChannelAdded { channel_id } => {
+                    serde_json::json!({
+                        "type": "group_channel_added",
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::PreferenceChanged { category, name, value } => {
+                    serde_json::json!({
+                        "type": "preference_changed",
+                        "category": category,
+                        "name": name,
+                        "value": value
+                    })
+                }
+                PlatformEvent::EphemeralMessage { message, channel_id } => {
+                    serde_json::json!({
+                        "type": "ephemeral_message",
+                        "message": message,
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::UserAdded { user_id } => {
+                    serde_json::json!({
+                        "type": "user_added",
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::UserUpdated { user_id } => {
+                    serde_json::json!({
+                        "type": "user_updated",
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::UserRoleUpdated { user_id } => {
+                    serde_json::json!({
+                        "type": "user_role_updated",
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::ChannelViewed { user_id, channel_id } => {
+                    serde_json::json!({
+                        "type": "channel_viewed",
+                        "user_id": user_id,
+                        "channel_id": channel_id
+                    })
+                }
             };
 
             match serde_json::to_string(&json) {

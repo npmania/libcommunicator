@@ -76,6 +76,46 @@ pub enum PlatformEvent {
     UserLeftChannel { user_id: String, channel_id: String },
     /// Connection state changed
     ConnectionStateChanged(crate::types::connection::ConnectionState),
+    /// A reaction was added to a message
+    ReactionAdded {
+        message_id: String,
+        user_id: String,
+        emoji_name: String,
+        channel_id: String,
+    },
+    /// A reaction was removed from a message
+    ReactionRemoved {
+        message_id: String,
+        user_id: String,
+        emoji_name: String,
+        channel_id: String,
+    },
+    /// A direct message channel was created
+    DirectChannelAdded { channel_id: String },
+    /// A group message channel was created
+    GroupChannelAdded { channel_id: String },
+    /// A user preference was changed
+    PreferenceChanged {
+        category: String,
+        name: String,
+        value: String,
+    },
+    /// An ephemeral message was received (temporary, typically bot responses)
+    EphemeralMessage {
+        message: String,
+        channel_id: String,
+    },
+    /// A new user joined the team/server
+    UserAdded { user_id: String },
+    /// A user's profile was updated
+    UserUpdated { user_id: String },
+    /// A user's role was updated
+    UserRoleUpdated { user_id: String },
+    /// A user viewed a channel
+    ChannelViewed {
+        user_id: String,
+        channel_id: String,
+    },
 }
 
 /// Trait that all platform adapters must implement
