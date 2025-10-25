@@ -144,12 +144,18 @@ impl WebSocketManager {
         match ws_event.event.as_str() {
             "posted" => {
                 // Extract and deserialize the post data from the event
+                // Note: The "post" field is a JSON-encoded string, not a nested object
                 if let Some(post_data) = ws_event.data.get("post") {
-                    if let Ok(post_str) = serde_json::to_string(post_data) {
-                        if let Ok(post) = serde_json::from_str::<MattermostPost>(&post_str) {
+                    // Get the string value directly (it's already JSON-encoded)
+                    if let Some(post_str) = post_data.as_str() {
+                        if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             let message = post.into();
                             return Some(PlatformEvent::MessagePosted(message));
+                        } else {
+                            eprintln!("Failed to deserialize post JSON: {}", post_str);
                         }
+                    } else {
+                        eprintln!("Post data is not a string: {:?}", post_data);
                     }
                 }
                 eprintln!("Failed to parse 'posted' event data");
@@ -157,22 +163,42 @@ impl WebSocketManager {
             }
             "post_edited" => {
                 // Extract and deserialize the post data for the edited message
+                // Note: The "post" field is a JSON-encoded string, not a nested object
                 if let Some(post_data) = ws_event.data.get("post") {
-                    if let Ok(post_str) = serde_json::to_string(post_data) {
-                        if let Ok(post) = serde_json::from_str::<MattermostPost>(&post_str) {
+                    // Get the string value directly (it's already JSON-encoded)
+                    if let Some(post_str) = post_data.as_str() {
+                        if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             let message = post.into();
                             return Some(PlatformEvent::MessageUpdated(message));
+                        } else {
+                            eprintln!("Failed to deserialize post JSON: {}", post_str);
                         }
+                    } else {
+                        eprintln!("Post data is not a string: {:?}", post_data);
                     }
                 }
                 eprintln!("Failed to parse 'post_edited' event data");
                 None
             }
             "post_deleted" => {
-                let post_id = ws_event.data.get("post")
-                    .and_then(|p| p.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                // Extract the post ID from the post data
+                // Note: The "post" field is a JSON-encoded string containing the full post object
+                let post_id = if let Some(post_data) = ws_event.data.get("post") {
+                    if let Some(post_str) = post_data.as_str() {
+                        // Parse the post to extract the ID
+                        if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
+                            post.id
+                        } else {
+                            eprintln!("Failed to deserialize post JSON for deletion: {}", post_str);
+                            String::new()
+                        }
+                    } else {
+                        eprintln!("Post data is not a string: {:?}", post_data);
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                };
 
                 Some(PlatformEvent::MessageDeleted {
                     message_id: post_id,
@@ -314,9 +340,8 @@ mod tests {
     async fn test_event_queue() {
         let manager = WebSocketManager::new("https://mattermost.example.com", "token".to_string());
 
-        // Initially empty
-        assert!(!manager.has_events().await);
-        assert_eq!(manager.event_count().await, 0);
+        // Initially empty - poll should return None
+        assert!(manager.poll_event().await.is_none());
 
         // Add an event manually
         {
@@ -327,12 +352,66 @@ mod tests {
             });
         }
 
-        assert!(manager.has_events().await);
-        assert_eq!(manager.event_count().await, 1);
-
         // Poll event
         let event = manager.poll_event().await;
         assert!(event.is_some());
-        assert!(!manager.has_events().await);
+
+        // Queue should be empty again
+        assert!(manager.poll_event().await.is_none());
+    }
+
+    #[test]
+    fn test_parse_posted_event() {
+        // Real data from Mattermost WebSocket
+        let json = r#"{"event": "posted", "data": {"channel_display_name":"@jay","channel_name":"t1pn9rb63fnpjrqibgriijcx4r__xei6dqz8xfgm7kqzddjziyofyo","channel_type":"D","post":"{\"id\":\"a4aurxyyc3yruntz4zfmdw75nr\",\"create_at\":1761422860825,\"update_at\":1761422860825,\"edit_at\":0,\"delete_at\":0,\"is_pinned\":false,\"user_id\":\"t1pn9rb63fnpjrqibgriijcx4r\",\"channel_id\":\"4ckrmjaeeb8mbpodbmo6bknpge\",\"root_id\":\"\",\"original_id\":\"\",\"message\":\"aweff\",\"type\":\"\",\"props\":{\"disable_group_highlight\":true},\"hashtags\":\"\",\"file_ids\":[],\"pending_post_id\":\"t1pn9rb63fnpjrqibgriijcx4r:1761422860771\",\"remote_id\":\"\",\"reply_count\":0,\"last_reply_at\":0,\"participants\":null,\"metadata\":{}}","sender_name":"@jay","set_online":true,"team_id":""}, "broadcast": {"omit_users":null,"user_id":"","channel_id":"4ckrmjaeeb8mbpodbmo6bknpge","team_id":"","connection_id":"","omit_connection_id":""}, "seq": 35}"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse posted event");
+        if let Some(PlatformEvent::MessagePosted(msg)) = platform_event {
+            assert_eq!(msg.id, "a4aurxyyc3yruntz4zfmdw75nr");
+            assert_eq!(msg.text, "aweff");
+            assert_eq!(msg.channel_id, "4ckrmjaeeb8mbpodbmo6bknpge");
+            assert_eq!(msg.sender_id, "t1pn9rb63fnpjrqibgriijcx4r");
+        } else {
+            panic!("Expected MessagePosted event");
+        }
+    }
+
+    #[test]
+    fn test_parse_post_edited_event() {
+        // Real data from Mattermost WebSocket
+        let json = r#"{"event": "post_edited", "data": {"post":"{\"id\":\"a4aurxyyc3yruntz4zfmdw75nr\",\"create_at\":1761422860825,\"update_at\":1761422988059,\"edit_at\":1761422988059,\"delete_at\":0,\"is_pinned\":false,\"user_id\":\"t1pn9rb63fnpjrqibgriijcx4r\",\"channel_id\":\"4ckrmjaeeb8mbpodbmo6bknpge\",\"root_id\":\"\",\"original_id\":\"\",\"message\":\"awe\",\"type\":\"\",\"props\":{\"disable_group_highlight\":true},\"hashtags\":\"\",\"file_ids\":[],\"pending_post_id\":\"\",\"remote_id\":\"\",\"reply_count\":0,\"last_reply_at\":0,\"participants\":null,\"metadata\":{}}"}, "broadcast": {"omit_users":null,"user_id":"","channel_id":"4ckrmjaeeb8mbpodbmo6bknpge","team_id":"","connection_id":"","omit_connection_id":""}, "seq": 37}"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse post_edited event");
+        if let Some(PlatformEvent::MessageUpdated(msg)) = platform_event {
+            assert_eq!(msg.id, "a4aurxyyc3yruntz4zfmdw75nr");
+            assert_eq!(msg.text, "awe");
+            assert_eq!(msg.channel_id, "4ckrmjaeeb8mbpodbmo6bknpge");
+            assert_eq!(msg.sender_id, "t1pn9rb63fnpjrqibgriijcx4r");
+        } else {
+            panic!("Expected MessageUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_post_deleted_event() {
+        // Real data from Mattermost WebSocket
+        let json = r#"{"event": "post_deleted", "data": {"post":"{\"id\":\"a4aurxyyc3yruntz4zfmdw75nr\",\"create_at\":1761422860825,\"update_at\":1761422988059,\"edit_at\":1761422988059,\"delete_at\":0,\"is_pinned\":false,\"user_id\":\"t1pn9rb63fnpjrqibgriijcx4r\",\"channel_id\":\"4ckrmjaeeb8mbpodbmo6bknpge\",\"root_id\":\"\",\"original_id\":\"\",\"message\":\"awe\",\"type\":\"\",\"props\":{\"disable_group_highlight\":true},\"hashtags\":\"\",\"file_ids\":[],\"pending_post_id\":\"\",\"remote_id\":\"\",\"reply_count\":0,\"last_reply_at\":0,\"participants\":null}"}, "broadcast": {"omit_users":null,"user_id":"","channel_id":"4ckrmjaeeb8mbpodbmo6bknpge","team_id":"","connection_id":"","omit_connection_id":"","contains_sanitized_data":true}, "seq": 38}"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse post_deleted event");
+        if let Some(PlatformEvent::MessageDeleted { message_id, channel_id }) = platform_event {
+            assert_eq!(message_id, "a4aurxyyc3yruntz4zfmdw75nr");
+            assert_eq!(channel_id, "4ckrmjaeeb8mbpodbmo6bknpge");
+        } else {
+            panic!("Expected MessageDeleted event");
+        }
     }
 }
