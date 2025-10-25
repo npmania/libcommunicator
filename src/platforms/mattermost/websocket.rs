@@ -67,6 +67,8 @@ pub struct WebSocketManager {
     shutdown_tx: Option<mpsc::Sender<()>>,
     /// Sequence number for WebSocket messages
     seq_number: Arc<Mutex<i64>>,
+    /// Last received sequence number for gap detection
+    last_received_seq: Arc<Mutex<i64>>,
     /// Current connection state
     connection_state: Arc<Mutex<ConnectionState>>,
 }
@@ -106,8 +108,25 @@ impl WebSocketManager {
             ws_writer: Arc::new(Mutex::new(None)),
             shutdown_tx: None,
             seq_number: Arc::new(Mutex::new(1)),
+            last_received_seq: Arc::new(Mutex::new(0)),
             connection_state: Arc::new(Mutex::new(ConnectionState::Disconnected)),
         }
+    }
+
+    /// Send typing indicator to a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel to send typing indicator to
+    pub async fn send_typing_indicator(&self, channel_id: &str) -> Result<()> {
+        let action = serde_json::json!({
+            "action": "user_typing",
+            "seq": self.next_seq().await,
+            "data": {
+                "channel_id": channel_id,
+            }
+        });
+
+        self.send_ws_message(Message::Text(action.to_string())).await
     }
 
     /// Get the current connection state
@@ -205,6 +224,7 @@ impl WebSocketManager {
         let event_tx = self.event_tx.clone();
         let connection_state = Arc::clone(&self.connection_state);
         let ws_writer = Arc::clone(&self.ws_writer);
+        let last_received_seq = Arc::clone(&self.last_received_seq);
         let ping_interval = std::time::Duration::from_secs(self.config.ping_interval_secs);
 
         // Spawn a task to handle incoming messages
@@ -219,7 +239,7 @@ impl WebSocketManager {
                     msg = read.next() => {
                         match msg {
                             Some(Ok(Message::Text(text))) => {
-                                if let Err(e) = Self::handle_message(text, &event_tx).await {
+                                if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
                                     eprintln!("Error handling WebSocket message: {}", e);
                                 }
                             }
@@ -288,7 +308,11 @@ impl WebSocketManager {
     }
 
     /// Handle an incoming WebSocket message
-    async fn handle_message(text: String, event_tx: &mpsc::Sender<PlatformEvent>) -> Result<()> {
+    async fn handle_message(
+        text: String,
+        event_tx: &mpsc::Sender<PlatformEvent>,
+        last_received_seq: &Arc<Mutex<i64>>,
+    ) -> Result<()> {
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
             .map_err(|e| {
                 // Log raw message snippet for debugging (first 200 chars)
@@ -296,6 +320,21 @@ impl WebSocketManager {
                 eprintln!("Failed to parse WebSocket event: {} | Raw: {}", e, snippet);
                 Error::new(ErrorCode::Unknown, &format!("Failed to parse WebSocket event: {}", e))
             })?;
+
+        // Check for sequence gaps
+        if ws_event.seq > 0 {
+            let mut last_seq = last_received_seq.lock().await;
+            let expected_seq = *last_seq + 1;
+            if *last_seq > 0 && ws_event.seq > expected_seq {
+                eprintln!(
+                    "WARNING: WebSocket sequence gap detected! Expected {}, got {}. {} events may have been missed.",
+                    expected_seq,
+                    ws_event.seq,
+                    ws_event.seq - expected_seq
+                );
+            }
+            *last_seq = ws_event.seq;
+        }
 
         // Convert WebSocket event to PlatformEvent
         if let Some(platform_event) = Self::convert_event(ws_event) {
@@ -461,9 +500,39 @@ impl WebSocketManager {
                 // Connection established event - can be ignored or logged
                 None
             }
+            "reaction_added" | "reaction_removed" => {
+                // Emoji reactions - log for now (full implementation would require Reaction type in platform_trait)
+                println!("Reaction event: {} in channel {}", ws_event.event, ws_event.broadcast.channel_id);
+                None
+            }
+            "direct_added" | "group_added" => {
+                // New DM/GM channel created - log for now
+                println!("New channel event: {} - channel {}", ws_event.event, ws_event.broadcast.channel_id);
+                None
+            }
+            "preference_changed" | "preferences_changed" => {
+                // User preferences changed - log for now
+                println!("Preference changed event");
+                None
+            }
+            "ephemeral_message" => {
+                // Ephemeral message (temporary, usually bot responses) - log for now
+                println!("Ephemeral message received");
+                None
+            }
+            "new_user" | "user_updated" | "user_role_updated" => {
+                // User events - log for now
+                println!("User event: {}", ws_event.event);
+                None
+            }
+            "channel_viewed" => {
+                // User viewed channel - log for now
+                println!("Channel viewed: {}", ws_event.broadcast.channel_id);
+                None
+            }
             _ => {
-                // Unknown event type
-                println!("Unknown WebSocket event: {}", ws_event.event);
+                // Unknown event type - log for visibility
+                println!("Unknown/unhandled WebSocket event: {}", ws_event.event);
                 None
             }
         }
