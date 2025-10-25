@@ -4,7 +4,17 @@
 //! The OpenAPI specification for the Mattermost API is available in
 //! `api-spec.yaml` in this directory.
 
-// TODO: Implement Mattermost client
-// TODO: Implement authentication (session tokens, personal access tokens)
-// TODO: Implement WebSocket event handling
-// TODO: Implement REST API operations (users, channels, posts, etc.)
+mod auth;
+mod channels;
+mod client;
+mod convert;
+mod platform_impl;
+mod posts;
+mod types;
+mod users;
+mod websocket;
+
+pub use client::MattermostClient;
+pub use convert::status_string_to_user_status;
+pub use platform_impl::MattermostPlatform;
+pub use types::*;
