@@ -35,6 +35,69 @@ impl MattermostPlatform {
     pub fn client(&self) -> &MattermostClient {
         &self.client
     }
+
+    /// Convert a Mattermost channel to our Channel type with proper DM/GM handling
+    async fn convert_channel_with_context(
+        &self,
+        mm_channel: super::types::MattermostChannel,
+        current_user_id: Option<&str>,
+    ) -> Result<Channel> {
+        use super::channels::get_dm_partner_id;
+        use super::convert::ConversionContext;
+
+        // Create conversion context with server URL and current user
+        let mut ctx = ConversionContext::new(self.server_url.clone());
+        if let Some(user_id) = current_user_id {
+            ctx = ctx.with_current_user(user_id.to_string());
+        }
+
+        // Convert the channel with context
+        let mut channel = mm_channel.to_channel_with_context(&ctx);
+
+        // For DM channels, fetch the other user's name and use it as display name
+        // Note: DM channel "name" field contains user IDs in format "user1id__user2id"
+        if mm_channel.channel_type == "D" {
+            if let Some(user_id) = current_user_id {
+                // Check if this is a self-DM (saved messages) - both user IDs are the same
+                if mm_channel.name == format!("{}__{}", user_id, user_id) {
+                    // This is a DM with yourself
+                    channel.display_name = "You (Saved Messages)".to_string();
+                } else if let Some(partner_id) = get_dm_partner_id(&mm_channel.name, user_id) {
+                    // Regular DM with another user - use the "name" field which contains user IDs
+                    match self.client.get_user(&partner_id).await {
+                        Ok(partner_user) => {
+                            // Build display name from partner's information
+                            let display_name = if !partner_user.first_name.is_empty() || !partner_user.last_name.is_empty() {
+                                format!("{} {}", partner_user.first_name, partner_user.last_name).trim().to_string()
+                            } else if !partner_user.nickname.is_empty() {
+                                partner_user.nickname.clone()
+                            } else {
+                                partner_user.username.clone()
+                            };
+                            channel.display_name = display_name;
+                        }
+                        Err(e) => {
+                            // Log error but don't fail the whole operation
+                            eprintln!("Failed to fetch DM partner user {}: {}", partner_id, e);
+                            // Fall back to a generic name
+                            channel.display_name = "Direct Message".to_string();
+                        }
+                    }
+                }
+            }
+        }
+        // For group channels, we could fetch all participants and build a name
+        // For now, we'll use the existing display_name from the API
+        else if mm_channel.channel_type == "G" && (mm_channel.display_name.is_empty() || current_user_id.is_some()) {
+            // Group channels may need similar treatment
+            // This could be enhanced in the future to fetch all member names
+            if channel.display_name.is_empty() {
+                channel.display_name = "Group Message".to_string();
+            }
+        }
+
+        Ok(channel)
+    }
 }
 
 #[async_trait]
@@ -111,12 +174,24 @@ impl Platform for MattermostPlatform {
         })?;
 
         let mm_channels = self.client.get_channels_for_team(&team_id).await?;
-        Ok(mm_channels.into_iter().map(|ch| ch.into()).collect())
+
+        // Get current user ID for DM channel context
+        let current_user_id = self.client.get_user_id().await;
+
+        // Convert channels with proper DM handling
+        let mut channels = Vec::new();
+        for mm_channel in mm_channels {
+            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            channels.push(channel);
+        }
+
+        Ok(channels)
     }
 
     async fn get_channel(&self, channel_id: &str) -> Result<Channel> {
         let mm_channel = self.client.get_channel(channel_id).await?;
-        Ok(mm_channel.into())
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
     }
 
     async fn get_messages(&self, channel_id: &str, limit: usize) -> Result<Vec<Message>> {
@@ -166,7 +241,8 @@ impl Platform for MattermostPlatform {
 
     async fn create_direct_channel(&self, user_id: &str) -> Result<Channel> {
         let mm_channel = self.client.create_direct_channel(user_id).await?;
-        Ok(mm_channel.into())
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
     }
 
     async fn get_teams(&self) -> Result<Vec<Team>> {
@@ -326,12 +402,14 @@ impl Platform for MattermostPlatform {
 
     async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
         let mm_channel = self.client.get_channel_by_name(team_id, channel_name).await?;
-        Ok(mm_channel.into())
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
     }
 
     async fn create_group_channel(&self, user_ids: Vec<String>) -> Result<Channel> {
         let mm_channel = self.client.create_group_channel(user_ids).await?;
-        Ok(mm_channel.into())
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
     }
 
     async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {

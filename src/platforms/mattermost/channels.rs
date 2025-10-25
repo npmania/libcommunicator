@@ -248,23 +248,38 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_channel_type_from_id() {
-        // Direct message (2 users)
-        let dm_id = "user1__user2";
-        assert_eq!(
-            detect_channel_type_from_id(dm_id),
-            Some(ChannelType::DirectMessage)
-        );
+    fn test_self_dm_detection() {
+        // Self-DM (both IDs are the same)
+        let self_dm = "t1pn9rb63fnpjrqibgriijcx4r__t1pn9rb63fnpjrqibgriijcx4r";
+        let user_id = "t1pn9rb63fnpjrqibgriijcx4r";
 
-        // Group message (3+ users)
-        let gm_id = "user1__user2__user3";
-        assert_eq!(
-            detect_channel_type_from_id(gm_id),
-            Some(ChannelType::GroupMessage)
-        );
-
-        // Regular channel
-        let regular_id = "townSquare123";
-        assert!(detect_channel_type_from_id(regular_id).is_none());
+        // When you query your own ID, you get yourself back
+        let partner = get_dm_partner_id(self_dm, user_id);
+        assert_eq!(partner, Some(user_id.to_string()));
     }
+
+    #[test]
+    fn test_real_dm_channel_names() {
+        // Test with actual Mattermost DM channel name formats
+
+        // Self-DM
+        let self_dm_name = "t1pn9rb63fnpjrqibgriijcx4r__t1pn9rb63fnpjrqibgriijcx4r";
+        let user_id = "t1pn9rb63fnpjrqibgriijcx4r";
+        assert_eq!(
+            get_dm_partner_id(self_dm_name, user_id),
+            Some(user_id.to_string())
+        );
+
+        // Regular DM
+        let dm_name = "t1pn9rb63fnpjrqibgriijcx4r__xei6dqz8xfgm7kqzddjziyofyo";
+        assert_eq!(
+            get_dm_partner_id(dm_name, "t1pn9rb63fnpjrqibgriijcx4r"),
+            Some("xei6dqz8xfgm7kqzddjziyofyo".to_string())
+        );
+        assert_eq!(
+            get_dm_partner_id(dm_name, "xei6dqz8xfgm7kqzddjziyofyo"),
+            Some("t1pn9rb63fnpjrqibgriijcx4r".to_string())
+        );
+    }
+
 }

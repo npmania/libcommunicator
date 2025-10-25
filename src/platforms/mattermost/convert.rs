@@ -194,10 +194,11 @@ impl MattermostChannel {
             "delete_at": self.delete_at,
         });
 
-        // For DM channels, try to extract partner user ID
+        // For DM channels, try to extract partner user ID from the "name" field
+        // Note: DM channel "name" field contains user IDs in format "user1id__user2id"
         if self.channel_type == "D" {
             if let Some(ref user_id) = ctx.current_user_id {
-                if let Some(partner_id) = get_dm_partner_id(&self.id, user_id) {
+                if let Some(partner_id) = get_dm_partner_id(&self.name, user_id) {
                     metadata["dm_partner_id"] = serde_json::json!(partner_id);
                 }
             }
