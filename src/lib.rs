@@ -1407,6 +1407,1068 @@ pub extern "C" fn communicator_platform_poll_event(handle: PlatformHandle) -> *m
     }
 }
 
+// ============================================================================
+// Extended Platform FFI Functions
+// ============================================================================
+
+/// FFI function: Send a reply to a message (threaded conversation)
+/// Returns a JSON string representing the created Message
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_send_reply(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    text: *const c_char,
+    root_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || text.is_null() || root_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let text_str = unsafe {
+        match std::ffi::CStr::from_ptr(text).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let root_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(root_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.send_reply(channel_id_str, text_str, root_id_str)) {
+        Ok(message) => match serde_json::to_string(&message) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize message: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Update/edit a message
+/// Returns a JSON string representing the updated Message
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_update_message(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+    new_text: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() || new_text.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let message_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let text_str = unsafe {
+        match std::ffi::CStr::from_ptr(new_text).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.update_message(message_id_str, text_str)) {
+        Ok(message) => match serde_json::to_string(&message) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize message: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Delete a message
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_delete_message(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let message_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.delete_message(message_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get a specific message by ID
+/// Returns a JSON string representing the Message
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_message(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let message_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_message(message_id_str)) {
+        Ok(message) => match serde_json::to_string(&message) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize message: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Search for messages
+/// Returns a JSON array string of Message objects
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_search_messages(
+    handle: PlatformHandle,
+    query: *const c_char,
+    limit: u32,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || query.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let query_str = unsafe {
+        match std::ffi::CStr::from_ptr(query).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.search_messages(query_str, limit as usize)) {
+        Ok(messages) => match serde_json::to_string(&messages) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize messages: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get messages before a specific message (pagination)
+/// Returns a JSON array string of Message objects
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_messages_before(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    before_id: *const c_char,
+    limit: u32,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || before_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let before_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(before_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_messages_before(channel_id_str, before_id_str, limit as usize)) {
+        Ok(messages) => match serde_json::to_string(&messages) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize messages: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get messages after a specific message (pagination)
+/// Returns a JSON array string of Message objects
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_messages_after(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    after_id: *const c_char,
+    limit: u32,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || after_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let after_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(after_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_messages_after(channel_id_str, after_id_str, limit as usize)) {
+        Ok(messages) => match serde_json::to_string(&messages) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize messages: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get a channel by name
+/// Returns a JSON string representing the Channel
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_channel_by_name(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+    channel_name: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() || channel_name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let channel_name_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_channel_by_name(team_id_str, channel_name_str)) {
+        Ok(channel) => match serde_json::to_string(&channel) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize channel: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Create a group direct message channel
+/// user_ids_json: JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+/// Returns a JSON string representing the created Channel
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_create_group_channel(
+    handle: PlatformHandle,
+    user_ids_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || user_ids_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let user_ids_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    // Parse JSON array of user IDs
+    let user_ids: Vec<String> = match serde_json::from_str(user_ids_str) {
+        Ok(ids) => ids,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Invalid user IDs JSON: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.create_group_channel(user_ids)) {
+        Ok(channel) => match serde_json::to_string(&channel) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize channel: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Add a user to a channel
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_add_channel_member(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    user_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || user_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let user_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.add_channel_member(channel_id_str, user_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Remove a user from a channel
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_remove_channel_member(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    user_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || user_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let user_id_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.remove_channel_member(channel_id_str, user_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get a user by username
+/// Returns a JSON string representing the User
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_user_by_username(
+    handle: PlatformHandle,
+    username: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || username.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let username_str = unsafe {
+        match std::ffi::CStr::from_ptr(username).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_user_by_username(username_str)) {
+        Ok(user) => match serde_json::to_string(&user) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize user: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get a user by email
+/// Returns a JSON string representing the User
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_user_by_email(
+    handle: PlatformHandle,
+    email: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || email.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let email_str = unsafe {
+        match std::ffi::CStr::from_ptr(email).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_user_by_email(email_str)) {
+        Ok(user) => match serde_json::to_string(&user) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize user: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get multiple users by their IDs (batch operation)
+/// user_ids_json: JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+/// Returns a JSON array string of User objects
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_users_by_ids(
+    handle: PlatformHandle,
+    user_ids_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || user_ids_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let user_ids_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    // Parse JSON array of user IDs
+    let user_ids: Vec<String> = match serde_json::from_str(user_ids_str) {
+        Ok(ids) => ids,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Invalid user IDs JSON: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_users_by_ids(user_ids)) {
+        Ok(users) => match serde_json::to_string(&users) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize users: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Set a custom status message
+/// custom_status_json: JSON object with format:
+/// {
+///   "emoji": "optional-emoji",
+///   "text": "status text",
+///   "expires_at": 1234567890  // Optional Unix timestamp
+/// }
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_set_custom_status(
+    handle: PlatformHandle,
+    custom_status_json: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || custom_status_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let status_str = unsafe {
+        match std::ffi::CStr::from_ptr(custom_status_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    // Parse custom status JSON
+    #[derive(serde::Deserialize)]
+    struct CustomStatusJson {
+        emoji: Option<String>,
+        text: String,
+        expires_at: Option<i64>,
+    }
+
+    let status_data: CustomStatusJson = match serde_json::from_str(status_str) {
+        Ok(s) => s,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Invalid custom status JSON: {}", e),
+            ));
+            return ErrorCode::InvalidArgument;
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.set_custom_status(
+        status_data.emoji.as_deref(),
+        &status_data.text,
+        status_data.expires_at,
+    )) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Remove/clear the current user's custom status
+/// Returns ErrorCode indicating success or failure
+#[no_mangle]
+pub extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHandle) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.remove_custom_status()) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get status for multiple users (batch operation)
+/// user_ids_json: JSON array of user IDs, e.g. ["user1", "user2", "user3"]
+/// Returns a JSON object mapping user IDs to status strings: {"user1": "online", "user2": "away", ...}
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_users_status(
+    handle: PlatformHandle,
+    user_ids_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || user_ids_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let user_ids_str = unsafe {
+        match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    // Parse JSON array of user IDs
+    let user_ids: Vec<String> = match serde_json::from_str(user_ids_str) {
+        Ok(ids) => ids,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Invalid user IDs JSON: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_users_status(user_ids)) {
+        Ok(status_map) => {
+            // Convert UserStatus enum to strings
+            let status_strings: std::collections::HashMap<String, String> = status_map
+                .into_iter()
+                .map(|(id, status)| {
+                    let status_str = match status {
+                        crate::types::user::UserStatus::Online => "online",
+                        crate::types::user::UserStatus::Away => "away",
+                        crate::types::user::UserStatus::DoNotDisturb => "dnd",
+                        crate::types::user::UserStatus::Offline => "offline",
+                        crate::types::user::UserStatus::Unknown => "unknown",
+                    };
+                    (id, status_str.to_string())
+                })
+                .collect();
+
+            match serde_json::to_string(&status_strings) {
+                Ok(json) => match CString::new(json) {
+                    Ok(c_string) => c_string.into_raw(),
+                    Err(_) => {
+                        error::set_last_error(Error::new(
+                            ErrorCode::OutOfMemory,
+                            "Failed to allocate string",
+                        ));
+                        std::ptr::null_mut()
+                    }
+                },
+                Err(e) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        &format!("Failed to serialize status map: {}", e),
+                    ));
+                    std::ptr::null_mut()
+                }
+            }
+        }
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get a team by name
+/// Returns a JSON string representing the Team
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+pub extern "C" fn communicator_platform_get_team_by_name(
+    handle: PlatformHandle,
+    team_name: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_name_str = unsafe {
+        match std::ffi::CStr::from_ptr(team_name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = unsafe { &**handle };
+
+    match runtime::block_on(platform.get_team_by_name(team_name_str)) {
+        Ok(team) => match serde_json::to_string(&team) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize team: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// FFI function: Destroy a platform and free its memory
 /// After calling this, the handle is invalid and must not be used
 #[no_mangle]

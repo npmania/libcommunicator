@@ -340,6 +340,443 @@ func (p *Platform) PollEvent() (*Event, error) {
 	return &event, nil
 }
 
+// SendReply sends a reply to a message (threaded conversation)
+func (p *Platform) SendReply(channelID, text, rootID string) (*Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	csText, freeText := cStringFree(text)
+	defer freeText()
+
+	csRootID, freeRootID := cStringFree(rootID)
+	defer freeRootID()
+
+	cstr := C.communicator_platform_send_reply(p.handle, csChannelID, csText, csRootID)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var msg Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &msg); err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
+}
+
+// UpdateMessage updates/edits a message
+func (p *Platform) UpdateMessage(messageID, newText string) (*Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csMessageID, freeMessageID := cStringFree(messageID)
+	defer freeMessageID()
+
+	csText, freeText := cStringFree(newText)
+	defer freeText()
+
+	cstr := C.communicator_platform_update_message(p.handle, csMessageID, csText)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var msg Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &msg); err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
+}
+
+// DeleteMessage deletes a message
+func (p *Platform) DeleteMessage(messageID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(messageID)
+	defer free()
+
+	code := C.communicator_platform_delete_message(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetMessage gets a specific message by ID
+func (p *Platform) GetMessage(messageID string) (*Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(messageID)
+	defer free()
+
+	cstr := C.communicator_platform_get_message(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var msg Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &msg); err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
+}
+
+// SearchMessages searches for messages
+func (p *Platform) SearchMessages(query string, limit uint32) ([]Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(query)
+	defer free()
+
+	cstr := C.communicator_platform_search_messages(p.handle, cs, C.uint32_t(limit))
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var messages []Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+// GetMessagesBefore gets messages before a specific message (pagination)
+func (p *Platform) GetMessagesBefore(channelID, beforeID string, limit uint32) ([]Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	csBeforeID, freeBeforeID := cStringFree(beforeID)
+	defer freeBeforeID()
+
+	cstr := C.communicator_platform_get_messages_before(p.handle, csChannelID, csBeforeID, C.uint32_t(limit))
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var messages []Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+// GetMessagesAfter gets messages after a specific message (pagination)
+func (p *Platform) GetMessagesAfter(channelID, afterID string, limit uint32) ([]Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	csAfterID, freeAfterID := cStringFree(afterID)
+	defer freeAfterID()
+
+	cstr := C.communicator_platform_get_messages_after(p.handle, csChannelID, csAfterID, C.uint32_t(limit))
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var messages []Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+// GetChannelByName gets a channel by name
+func (p *Platform) GetChannelByName(teamID, channelName string) (*Channel, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csTeamID, freeTeamID := cStringFree(teamID)
+	defer freeTeamID()
+
+	csChannelName, freeChannelName := cStringFree(channelName)
+	defer freeChannelName()
+
+	cstr := C.communicator_platform_get_channel_by_name(p.handle, csTeamID, csChannelName)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var channel Channel
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &channel); err != nil {
+		return nil, err
+	}
+
+	return &channel, nil
+}
+
+// CreateGroupChannel creates a group direct message channel
+func (p *Platform) CreateGroupChannel(userIDs []string) (*Channel, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	// Marshal user IDs to JSON
+	jsonBytes, err := json.Marshal(userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	cstr := C.communicator_platform_create_group_channel(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var channel Channel
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &channel); err != nil {
+		return nil, err
+	}
+
+	return &channel, nil
+}
+
+// AddChannelMember adds a user to a channel
+func (p *Platform) AddChannelMember(channelID, userID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	csUserID, freeUserID := cStringFree(userID)
+	defer freeUserID()
+
+	code := C.communicator_platform_add_channel_member(p.handle, csChannelID, csUserID)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// RemoveChannelMember removes a user from a channel
+func (p *Platform) RemoveChannelMember(channelID, userID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	csUserID, freeUserID := cStringFree(userID)
+	defer freeUserID()
+
+	code := C.communicator_platform_remove_channel_member(p.handle, csChannelID, csUserID)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetUserByUsername gets a user by username
+func (p *Platform) GetUserByUsername(username string) (*User, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(username)
+	defer free()
+
+	cstr := C.communicator_platform_get_user_by_username(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var user User
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// GetUserByEmail gets a user by email
+func (p *Platform) GetUserByEmail(email string) (*User, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(email)
+	defer free()
+
+	cstr := C.communicator_platform_get_user_by_email(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var user User
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// GetUsersByIDs gets multiple users by their IDs (batch operation)
+func (p *Platform) GetUsersByIDs(userIDs []string) ([]User, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	// Marshal user IDs to JSON
+	jsonBytes, err := json.Marshal(userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	cstr := C.communicator_platform_get_users_by_ids(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var users []User
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+// CustomStatus represents a custom status for a user
+type CustomStatus struct {
+	Emoji     string `json:"emoji,omitempty"`
+	Text      string `json:"text"`
+	ExpiresAt *int64 `json:"expires_at,omitempty"` // Unix timestamp
+}
+
+// SetCustomStatus sets a custom status message
+func (p *Platform) SetCustomStatus(status CustomStatus) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	// Marshal status to JSON
+	jsonBytes, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	code := C.communicator_platform_set_custom_status(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// RemoveCustomStatus removes/clears the current user's custom status
+func (p *Platform) RemoveCustomStatus() error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	code := C.communicator_platform_remove_custom_status(p.handle)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetUsersStatus gets status for multiple users (batch operation)
+// Returns a map of user IDs to status strings
+func (p *Platform) GetUsersStatus(userIDs []string) (map[string]string, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	// Marshal user IDs to JSON
+	jsonBytes, err := json.Marshal(userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	cstr := C.communicator_platform_get_users_status(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var statusMap map[string]string
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &statusMap); err != nil {
+		return nil, err
+	}
+
+	return statusMap, nil
+}
+
+// GetTeamByName gets a team by name
+func (p *Platform) GetTeamByName(teamName string) (*Team, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(teamName)
+	defer free()
+
+	cstr := C.communicator_platform_get_team_by_name(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var team Team
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &team); err != nil {
+		return nil, err
+	}
+
+	return &team, nil
+}
+
 // Destroy destroys the platform and frees its resources
 func (p *Platform) Destroy() {
 	if p.handle != nil {

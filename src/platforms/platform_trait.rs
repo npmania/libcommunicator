@@ -221,6 +221,244 @@ pub trait Platform: Send + Sync {
     /// This is a non-blocking check for new events.
     /// Returns None if no events are available.
     async fn poll_event(&mut self) -> Result<Option<PlatformEvent>>;
+
+    // ========================================================================
+    // Extended Platform Methods
+    // ========================================================================
+
+    /// Send a reply to a message (threaded conversation)
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `text` - The message text
+    /// * `root_id` - The ID of the message to reply to
+    ///
+    /// # Returns
+    /// The created reply message
+    ///
+    /// # Notes
+    /// Not all platforms support threading. Check `capabilities().has_threads` first.
+    async fn send_reply(&self, channel_id: &str, text: &str, root_id: &str) -> Result<Message> {
+        let _ = (channel_id, text, root_id);
+        Err(crate::error::Error::unsupported("Threaded messages not supported by this platform"))
+    }
+
+    /// Update/edit a message
+    ///
+    /// # Arguments
+    /// * `message_id` - The message ID to update
+    /// * `new_text` - The new message text
+    ///
+    /// # Returns
+    /// The updated message
+    ///
+    /// # Notes
+    /// Not all platforms support message editing. Check `capabilities().supports_message_editing` first.
+    async fn update_message(&self, message_id: &str, new_text: &str) -> Result<Message> {
+        let _ = (message_id, new_text);
+        Err(crate::error::Error::unsupported("Message editing not supported by this platform"))
+    }
+
+    /// Delete a message
+    ///
+    /// # Arguments
+    /// * `message_id` - The message ID to delete
+    ///
+    /// # Notes
+    /// Not all platforms support message deletion. Check `capabilities().supports_message_deletion` first.
+    async fn delete_message(&self, message_id: &str) -> Result<()> {
+        let _ = message_id;
+        Err(crate::error::Error::unsupported("Message deletion not supported by this platform"))
+    }
+
+    /// Get a specific message by ID
+    ///
+    /// # Arguments
+    /// * `message_id` - The message ID
+    ///
+    /// # Returns
+    /// The message
+    async fn get_message(&self, message_id: &str) -> Result<Message> {
+        let _ = message_id;
+        Err(crate::error::Error::unsupported("Get message by ID not supported by this platform"))
+    }
+
+    /// Search for messages
+    ///
+    /// # Arguments
+    /// * `query` - The search query
+    /// * `limit` - Maximum number of results
+    ///
+    /// # Returns
+    /// List of matching messages
+    ///
+    /// # Notes
+    /// Not all platforms support search. Check `capabilities().supports_search` first.
+    async fn search_messages(&self, query: &str, limit: usize) -> Result<Vec<Message>> {
+        let _ = (query, limit);
+        Err(crate::error::Error::unsupported("Message search not supported by this platform"))
+    }
+
+    /// Get messages before a specific message (pagination)
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `before_id` - Get messages before this message ID
+    /// * `limit` - Maximum number of messages to retrieve
+    ///
+    /// # Returns
+    /// List of messages
+    async fn get_messages_before(&self, channel_id: &str, before_id: &str, limit: usize) -> Result<Vec<Message>> {
+        let _ = (channel_id, before_id, limit);
+        Err(crate::error::Error::unsupported("Message pagination not supported by this platform"))
+    }
+
+    /// Get messages after a specific message (pagination)
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `after_id` - Get messages after this message ID
+    /// * `limit` - Maximum number of messages to retrieve
+    ///
+    /// # Returns
+    /// List of messages
+    async fn get_messages_after(&self, channel_id: &str, after_id: &str, limit: usize) -> Result<Vec<Message>> {
+        let _ = (channel_id, after_id, limit);
+        Err(crate::error::Error::unsupported("Message pagination not supported by this platform"))
+    }
+
+    /// Get a channel by name
+    ///
+    /// # Arguments
+    /// * `team_id` - The team ID (required for platforms with workspaces)
+    /// * `channel_name` - The channel name
+    ///
+    /// # Returns
+    /// The channel
+    async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
+        let _ = (team_id, channel_name);
+        Err(crate::error::Error::unsupported("Get channel by name not supported by this platform"))
+    }
+
+    /// Create a group direct message channel
+    ///
+    /// # Arguments
+    /// * `user_ids` - List of user IDs to include in the group
+    ///
+    /// # Returns
+    /// The created group channel
+    ///
+    /// # Notes
+    /// Not all platforms support group messages. Check `capabilities().supports_group_messages` first.
+    async fn create_group_channel(&self, user_ids: Vec<String>) -> Result<Channel> {
+        let _ = user_ids;
+        Err(crate::error::Error::unsupported("Group channels not supported by this platform"))
+    }
+
+    /// Add a user to a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `user_id` - The user ID to add
+    async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
+        let _ = (channel_id, user_id);
+        Err(crate::error::Error::unsupported("Channel member management not supported by this platform"))
+    }
+
+    /// Remove a user from a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `user_id` - The user ID to remove
+    async fn remove_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
+        let _ = (channel_id, user_id);
+        Err(crate::error::Error::unsupported("Channel member management not supported by this platform"))
+    }
+
+    /// Get a user by username
+    ///
+    /// # Arguments
+    /// * `username` - The username
+    ///
+    /// # Returns
+    /// The user
+    async fn get_user_by_username(&self, username: &str) -> Result<User> {
+        let _ = username;
+        Err(crate::error::Error::unsupported("User lookup by username not supported by this platform"))
+    }
+
+    /// Get a user by email
+    ///
+    /// # Arguments
+    /// * `email` - The email address
+    ///
+    /// # Returns
+    /// The user
+    async fn get_user_by_email(&self, email: &str) -> Result<User> {
+        let _ = email;
+        Err(crate::error::Error::unsupported("User lookup by email not supported by this platform"))
+    }
+
+    /// Get multiple users by their IDs (batch operation)
+    ///
+    /// # Arguments
+    /// * `user_ids` - List of user IDs
+    ///
+    /// # Returns
+    /// List of users
+    async fn get_users_by_ids(&self, user_ids: Vec<String>) -> Result<Vec<User>> {
+        let _ = user_ids;
+        Err(crate::error::Error::unsupported("Batch user lookup not supported by this platform"))
+    }
+
+    /// Set a custom status message
+    ///
+    /// # Arguments
+    /// * `emoji` - Optional emoji for the status
+    /// * `text` - Status text message
+    /// * `expires_at` - Optional expiration timestamp (Unix timestamp in seconds)
+    ///
+    /// # Notes
+    /// Not all platforms support custom status. Check `capabilities().supports_custom_status` first.
+    async fn set_custom_status(&self, emoji: Option<&str>, text: &str, expires_at: Option<i64>) -> Result<()> {
+        let _ = (emoji, text, expires_at);
+        Err(crate::error::Error::unsupported("Custom status not supported by this platform"))
+    }
+
+    /// Remove/clear the current user's custom status
+    ///
+    /// # Notes
+    /// Not all platforms support custom status. Check `capabilities().supports_custom_status` first.
+    async fn remove_custom_status(&self) -> Result<()> {
+        Err(crate::error::Error::unsupported("Custom status not supported by this platform"))
+    }
+
+    /// Get status for multiple users (batch operation)
+    ///
+    /// # Arguments
+    /// * `user_ids` - List of user IDs
+    ///
+    /// # Returns
+    /// Map of user_id to status
+    async fn get_users_status(&self, user_ids: Vec<String>) -> Result<std::collections::HashMap<String, UserStatus>> {
+        let _ = user_ids;
+        Err(crate::error::Error::unsupported("Batch user status not supported by this platform"))
+    }
+
+    /// Get a team by name
+    ///
+    /// # Arguments
+    /// * `team_name` - The team name
+    ///
+    /// # Returns
+    /// The team
+    ///
+    /// # Notes
+    /// Only applicable for platforms with workspaces. Check `capabilities().has_workspaces` first.
+    async fn get_team_by_name(&self, team_name: &str) -> Result<Team> {
+        let _ = team_name;
+        Err(crate::error::Error::unsupported("Team lookup by name not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

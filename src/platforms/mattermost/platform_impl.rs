@@ -240,6 +240,167 @@ impl Platform for MattermostPlatform {
         }
         Ok(None)
     }
+
+    // ========================================================================
+    // Extended Platform Methods Implementation
+    // ========================================================================
+
+    async fn send_reply(&self, channel_id: &str, text: &str, root_id: &str) -> Result<Message> {
+        let mm_post = self.client.send_reply(channel_id, text, root_id).await?;
+        Ok(mm_post.into())
+    }
+
+    async fn update_message(&self, message_id: &str, new_text: &str) -> Result<Message> {
+        let mm_post = self.client.update_post(message_id, new_text).await?;
+        Ok(mm_post.into())
+    }
+
+    async fn delete_message(&self, message_id: &str) -> Result<()> {
+        self.client.delete_post(message_id).await
+    }
+
+    async fn get_message(&self, message_id: &str) -> Result<Message> {
+        let mm_post = self.client.get_post(message_id).await?;
+        Ok(mm_post.into())
+    }
+
+    async fn search_messages(&self, query: &str, limit: usize) -> Result<Vec<Message>> {
+        // Get team ID from client state
+        let team_id = self.client.get_team_id().await.ok_or_else(|| {
+            Error::new(
+                ErrorCode::InvalidState,
+                "Team ID not set - call connect() with a team_id or set it manually",
+            )
+        })?;
+
+        let post_list = self.client.search_posts(&team_id, query).await?;
+
+        // Convert posts to messages, limited by the requested limit
+        let mut messages: Vec<Message> = post_list
+            .order
+            .iter()
+            .take(limit)
+            .filter_map(|post_id| post_list.posts.get(post_id))
+            .map(|post| post.clone().into())
+            .collect();
+
+        // Reverse to get most recent first
+        messages.reverse();
+
+        Ok(messages)
+    }
+
+    async fn get_messages_before(&self, channel_id: &str, before_id: &str, limit: usize) -> Result<Vec<Message>> {
+        let post_list = self.client.get_posts_before(channel_id, before_id, limit as u32).await?;
+
+        // Convert posts to messages in the correct order
+        let mut messages: Vec<Message> = post_list
+            .order
+            .iter()
+            .filter_map(|post_id| post_list.posts.get(post_id))
+            .map(|post| post.clone().into())
+            .collect();
+
+        // Reverse to get most recent first
+        messages.reverse();
+
+        Ok(messages)
+    }
+
+    async fn get_messages_after(&self, channel_id: &str, after_id: &str, limit: usize) -> Result<Vec<Message>> {
+        let post_list = self.client.get_posts_after(channel_id, after_id, limit as u32).await?;
+
+        // Convert posts to messages in the correct order
+        let mut messages: Vec<Message> = post_list
+            .order
+            .iter()
+            .filter_map(|post_id| post_list.posts.get(post_id))
+            .map(|post| post.clone().into())
+            .collect();
+
+        // Reverse to get most recent first
+        messages.reverse();
+
+        Ok(messages)
+    }
+
+    async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
+        let mm_channel = self.client.get_channel_by_name(team_id, channel_name).await?;
+        Ok(mm_channel.into())
+    }
+
+    async fn create_group_channel(&self, user_ids: Vec<String>) -> Result<Channel> {
+        let mm_channel = self.client.create_group_channel(user_ids).await?;
+        Ok(mm_channel.into())
+    }
+
+    async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
+        self.client.add_channel_member(channel_id, user_id).await?;
+        Ok(())
+    }
+
+    async fn remove_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
+        self.client.remove_channel_member(channel_id, user_id).await
+    }
+
+    async fn get_user_by_username(&self, username: &str) -> Result<User> {
+        let mm_user = self.client.get_user_by_username(username).await?;
+        Ok(mm_user.into())
+    }
+
+    async fn get_user_by_email(&self, email: &str) -> Result<User> {
+        let mm_user = self.client.get_user_by_email(email).await?;
+        Ok(mm_user.into())
+    }
+
+    async fn get_users_by_ids(&self, user_ids: Vec<String>) -> Result<Vec<User>> {
+        let mm_users = self.client.get_users_by_ids(&user_ids).await?;
+        Ok(mm_users.into_iter().map(|u| u.into()).collect())
+    }
+
+    async fn set_custom_status(&self, emoji: Option<&str>, text: &str, expires_at: Option<i64>) -> Result<()> {
+        use super::types::CustomStatus;
+
+        // Convert Unix timestamp (i64) to ISO 8601 string if provided
+        let expires_at_str = expires_at.map(|ts| {
+            // Convert Unix timestamp to ISO 8601 format
+            // For simplicity, using a basic conversion
+            use chrono::{DateTime, Utc};
+            let datetime = DateTime::<Utc>::from_timestamp(ts, 0)
+                .unwrap_or_else(|| Utc::now());
+            datetime.to_rfc3339()
+        });
+
+        let custom_status = CustomStatus {
+            emoji: emoji.map(|s| s.to_string()),
+            text: Some(text.to_string()),
+            duration: None,
+            expires_at: expires_at_str,
+        };
+
+        self.client.set_custom_status(custom_status).await
+    }
+
+    async fn remove_custom_status(&self) -> Result<()> {
+        self.client.remove_custom_status().await
+    }
+
+    async fn get_users_status(&self, user_ids: Vec<String>) -> Result<std::collections::HashMap<String, crate::types::user::UserStatus>> {
+        let mm_statuses = self.client.get_users_status_by_ids(&user_ids).await?;
+
+        let mut status_map = std::collections::HashMap::new();
+        for status in mm_statuses {
+            let user_status = super::status_string_to_user_status(&status.status);
+            status_map.insert(status.user_id, user_status);
+        }
+
+        Ok(status_map)
+    }
+
+    async fn get_team_by_name(&self, team_name: &str) -> Result<Team> {
+        let mm_team = self.client.get_team_by_name(team_name).await?;
+        Ok(mm_team.into())
+    }
 }
 
 #[cfg(test)]
