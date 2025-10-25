@@ -14,25 +14,28 @@ libcommunicator is a Rust library that provides the core communication layer for
 
 ### Platform Abstraction
 - Modular platform adapters for different chat services
-- Initial implementation: Slack
-- Future platforms: Mattermost, Discord, Microsoft Teams, etc.
+- Initial implementations: Slack, Mattermost
+- Future platforms: Discord, Microsoft Teams, etc.
 
 ## Project Structure
 
 ```
 libcommunicator/
-├── claude.md              # This file
+├── CLAUDE.md              # This file
 ├── Cargo.toml             # Rust project manifest
 ├── src/
 │   ├── lib.rs            # Main library entry point
-│   ├── ffi.rs            # C-compatible FFI exports
+│   ├── ffi.rs            # C-compatible FFI exports (planned)
 │   ├── platforms/        # Platform-specific implementations
 │   │   ├── mod.rs
-│   │   └── slack/        # Slack integration
-│   ├── types/            # Common data structures
-│   └── error.rs          # Error handling
+│   │   ├── slack/        # Slack integration (planned)
+│   │   └── mattermost/   # Mattermost integration
+│   │       ├── mod.rs
+│   │       └── api-spec.yaml  # Mattermost OpenAPI 3.0 specification
+│   ├── types/            # Common data structures (planned)
+│   └── error.rs          # Error handling (planned)
 ├── include/              # C header files for FFI
-└── examples/             # Usage examples for different languages
+└── examples/             # Usage examples for different languages (planned)
 ```
 
 ## Key Components
@@ -50,6 +53,32 @@ Each platform adapter implements:
 - Channel/conversation management
 - User management
 - Real-time event handling (websockets, webhooks, etc.)
+
+#### Mattermost Platform
+The Mattermost platform adapter is located in `src/platforms/mattermost/` and provides integration with Mattermost servers.
+
+**API Specification** (`api-spec.yaml`):
+- Complete OpenAPI 3.0 specification for Mattermost API v4
+- Documents all REST endpoints for users, teams, channels, posts, files, and more
+- Includes WebSocket event system documentation
+- Authentication methods: Session tokens, Personal Access Tokens, OAuth 2.0
+- Base URL pattern: `{your-mattermost-url}/api/v4`
+
+**Key API Features**:
+- **Authentication**: Multiple methods including email/password login, SSO (SAML/OAuth), LDAP
+- **REST API**: Full CRUD operations for all Mattermost resources
+- **WebSocket**: Real-time event delivery at `/api/v4/websocket` endpoint
+  - Events: posted, user_added, channel_updated, typing, status_change, etc.
+  - Bidirectional communication with sequence numbers
+- **Rate Limiting**: Includes X-Ratelimit-* headers for monitoring usage
+- **Error Handling**: Standardized JSON error responses with error IDs
+
+**Implementation TODO**:
+- HTTP client for REST API operations
+- WebSocket client for real-time events
+- Authentication manager (session tokens, PATs)
+- Type definitions matching API schemas
+- Error handling for Mattermost-specific errors
 
 ### Core Types
 - Connection handles
@@ -105,13 +134,30 @@ Key Rust crates:
 
 ## Current Status
 
-- Initial project setup
-- Slack platform adapter in development
+- Initial project setup complete
+- Platform module structure established
+- Mattermost platform:
+  - API specification imported (OpenAPI 3.0)
+  - Module structure created
+  - Implementation pending
+- Slack platform adapter: planned
 - FFI layer design in progress
 
 ## Development Notes
 
+### General
 - Use `cbindgen` to generate C headers from Rust code
 - Memory allocated by Rust must be freed by Rust
 - All FFI functions should be marked `#[no_mangle]` and `extern "C"`
 - Document all public FFI functions thoroughly
+
+### Working with Mattermost API Specification
+- The `api-spec.yaml` file in `src/platforms/mattermost/` is the authoritative source for API endpoints
+- Use the spec to:
+  - Understand available endpoints and their parameters
+  - Generate type definitions for request/response bodies
+  - Implement proper error handling based on documented error codes
+  - Reference WebSocket event types and message formats
+- The spec can be viewed in OpenAPI-compatible tools (Swagger UI, Postman, etc.)
+- Official Mattermost documentation: https://api.mattermost.com/
+- Consider using code generation tools like `openapi-generator` for type scaffolding

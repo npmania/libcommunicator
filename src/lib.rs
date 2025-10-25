@@ -1,6 +1,9 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
 
+// Platform-specific implementations
+pub mod platforms;
+
 /// Internal Rust function
 pub fn greet(name: &str) -> String {
     format!("Hello from libcommunicator, {}!", name)
