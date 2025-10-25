@@ -7,7 +7,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::PlatformEvent;
 
-use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, WebSocketAuthData, WebSocketEvent};
+use super::types::{MattermostChannel, MattermostPost, WebSocketAuthChallenge, WebSocketAuthData, WebSocketAuthResponse, WebSocketEvent};
 
 /// Type alias for the WebSocket write half
 type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
@@ -147,6 +147,47 @@ impl WebSocketManager {
         self.send_ws_message(Message::Text(action.to_string())).await
     }
 
+    /// Request user statuses via WebSocket API
+    ///
+    /// Sends a `get_statuses` action to retrieve status for all users.
+    /// The response will arrive as a `response` event with seq_reply matching the seq.
+    ///
+    /// # Returns
+    /// The sequence number of the request. You can match this with the `seq_reply`
+    /// field in the Response event to identify the response.
+    pub async fn get_statuses(&self) -> Result<i64> {
+        let seq = self.next_seq().await;
+        let action = serde_json::json!({
+            "action": "get_statuses",
+            "seq": seq,
+        });
+
+        self.send_ws_message(Message::Text(action.to_string())).await?;
+        Ok(seq)
+    }
+
+    /// Request statuses for specific users via WebSocket API
+    ///
+    /// # Arguments
+    /// * `user_ids` - List of user IDs to get statuses for
+    ///
+    /// # Returns
+    /// The sequence number of the request. You can match this with the `seq_reply`
+    /// field in the Response event to identify the response.
+    pub async fn get_statuses_by_ids(&self, user_ids: Vec<String>) -> Result<i64> {
+        let seq = self.next_seq().await;
+        let action = serde_json::json!({
+            "action": "get_statuses_by_ids",
+            "seq": seq,
+            "data": {
+                "user_ids": user_ids,
+            }
+        });
+
+        self.send_ws_message(Message::Text(action.to_string())).await?;
+        Ok(seq)
+    }
+
     /// Get the current connection state
     pub async fn get_connection_state(&self) -> ConnectionState {
         *self.connection_state.lock().await
@@ -256,7 +297,14 @@ impl WebSocketManager {
         // Store the write half for bidirectional communication
         *self.ws_writer.lock().await = Some(write);
 
-        // Mark as connected after successful authentication
+        // Note: The authentication response will arrive as a separate WebSocket message
+        // with the structure: {"status": "OK", "seq_reply": <seq>}
+        // After successful authentication, the server will send a "hello" event
+        // We don't wait for these synchronously here - they'll be processed by the
+        // message handling loop. The connection state will be updated once we start
+        // receiving events successfully.
+
+        // Mark as connected after successful authentication challenge sent
         self.set_connection_state(ConnectionState::Connected).await;
 
         // Reset reconnection counter on successful connection
@@ -518,6 +566,22 @@ impl WebSocketManager {
         event_tx: &mpsc::Sender<PlatformEvent>,
         last_received_seq: &Arc<Mutex<i64>>,
     ) -> Result<()> {
+        // First, try to parse as authentication response
+        // Auth responses have a different structure: {"status": "OK", "seq_reply": 1}
+        if let Ok(auth_response) = serde_json::from_str::<WebSocketAuthResponse>(&text) {
+            if auth_response.status == "OK" {
+                // Authentication successful - this is informational, not emitted as an event
+                return Ok(());
+            } else {
+                eprintln!("Authentication failed: status = {}", auth_response.status);
+                return Err(Error::new(
+                    ErrorCode::AuthenticationFailed,
+                    format!("Authentication failed with status: {}", auth_response.status)
+                ));
+            }
+        }
+
+        // Parse as a standard WebSocket event
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
             .map_err(|e| {
                 // Log raw message snippet for debugging (first 200 chars)
@@ -884,6 +948,331 @@ impl WebSocketManager {
                     eprintln!("Failed to parse channel_viewed event data");
                     None
                 }
+            }
+            "thread_updated" => {
+                let thread_id = ws_event.data.get("thread_id")
+                    .or_else(|| ws_event.data.get("post_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let channel_id = ws_event.broadcast.channel_id.clone();
+
+                if !thread_id.is_empty() && !channel_id.is_empty() {
+                    Some(PlatformEvent::ThreadUpdated {
+                        thread_id,
+                        channel_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse thread_updated event data");
+                    None
+                }
+            }
+            "thread_read_changed" => {
+                let thread_id = ws_event.data.get("thread_id")
+                    .or_else(|| ws_event.data.get("post_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let user_id = ws_event.broadcast.user_id.clone();
+                let channel_id = ws_event.broadcast.channel_id.clone();
+
+                if !thread_id.is_empty() {
+                    Some(PlatformEvent::ThreadReadChanged {
+                        thread_id,
+                        user_id,
+                        channel_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse thread_read_changed event data");
+                    None
+                }
+            }
+            "thread_follow_changed" => {
+                let thread_id = ws_event.data.get("thread_id")
+                    .or_else(|| ws_event.data.get("post_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let user_id = ws_event.broadcast.user_id.clone();
+                let channel_id = ws_event.broadcast.channel_id.clone();
+                let following = ws_event.data.get("state")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                if !thread_id.is_empty() {
+                    Some(PlatformEvent::ThreadFollowChanged {
+                        thread_id,
+                        user_id,
+                        channel_id,
+                        following,
+                    })
+                } else {
+                    eprintln!("Failed to parse thread_follow_changed event data");
+                    None
+                }
+            }
+            "post_unread" => {
+                let post_id = ws_event.data.get("post_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let user_id = ws_event.data.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let channel_id = ws_event.broadcast.channel_id.clone();
+
+                if !post_id.is_empty() {
+                    Some(PlatformEvent::PostUnread {
+                        post_id,
+                        channel_id,
+                        user_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse post_unread event data");
+                    None
+                }
+            }
+            "emoji_added" => {
+                let emoji_id = ws_event.data.get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let emoji_name = ws_event.data.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !emoji_id.is_empty() && !emoji_name.is_empty() {
+                    Some(PlatformEvent::EmojiAdded {
+                        emoji_id,
+                        emoji_name,
+                    })
+                } else {
+                    eprintln!("Failed to parse emoji_added event data");
+                    None
+                }
+            }
+            "added_to_team" => {
+                let team_id = ws_event.data.get("team_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let user_id = ws_event.data.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !team_id.is_empty() && !user_id.is_empty() {
+                    Some(PlatformEvent::AddedToTeam {
+                        team_id,
+                        user_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse added_to_team event data");
+                    None
+                }
+            }
+            "leave_team" => {
+                let team_id = ws_event.data.get("team_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let user_id = ws_event.data.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !team_id.is_empty() && !user_id.is_empty() {
+                    Some(PlatformEvent::LeftTeam {
+                        team_id,
+                        user_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse leave_team event data");
+                    None
+                }
+            }
+            "config_changed" => {
+                // Server configuration changed - no specific data needed
+                Some(PlatformEvent::ConfigChanged)
+            }
+            "license_changed" => {
+                // Server license changed - no specific data needed
+                Some(PlatformEvent::LicenseChanged)
+            }
+            "channel_converted" => {
+                let channel_id = ws_event.broadcast.channel_id.clone();
+                if !channel_id.is_empty() {
+                    Some(PlatformEvent::ChannelConverted { channel_id })
+                } else {
+                    eprintln!("Failed to parse channel_converted event: missing channel_id");
+                    None
+                }
+            }
+            "channel_member_updated" => {
+                let channel_id = ws_event.broadcast.channel_id.clone();
+                let user_id = ws_event.data.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !channel_id.is_empty() && !user_id.is_empty() {
+                    Some(PlatformEvent::ChannelMemberUpdated {
+                        channel_id,
+                        user_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse channel_member_updated event data");
+                    None
+                }
+            }
+            "delete_team" => {
+                let team_id = ws_event.data.get("team_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !team_id.is_empty() {
+                    Some(PlatformEvent::TeamDeleted { team_id })
+                } else {
+                    eprintln!("Failed to parse delete_team event data");
+                    None
+                }
+            }
+            "update_team" => {
+                let team_id = ws_event.data.get("team_id")
+                    .or_else(|| ws_event.data.get("team").and_then(|t| t.get("id")))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !team_id.is_empty() {
+                    Some(PlatformEvent::TeamUpdated { team_id })
+                } else {
+                    eprintln!("Failed to parse update_team event data");
+                    None
+                }
+            }
+            "memberrole_updated" => {
+                let channel_id = ws_event.broadcast.channel_id.clone();
+                let user_id = ws_event.data.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !channel_id.is_empty() && !user_id.is_empty() {
+                    Some(PlatformEvent::MemberRoleUpdated {
+                        channel_id,
+                        user_id,
+                    })
+                } else {
+                    eprintln!("Failed to parse memberrole_updated event data");
+                    None
+                }
+            }
+            "plugin_disabled" => {
+                let plugin_id = ws_event.data.get("id")
+                    .or_else(|| ws_event.data.get("plugin_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !plugin_id.is_empty() {
+                    Some(PlatformEvent::PluginDisabled { plugin_id })
+                } else {
+                    eprintln!("Failed to parse plugin_disabled event data");
+                    None
+                }
+            }
+            "plugin_enabled" => {
+                let plugin_id = ws_event.data.get("id")
+                    .or_else(|| ws_event.data.get("plugin_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !plugin_id.is_empty() {
+                    Some(PlatformEvent::PluginEnabled { plugin_id })
+                } else {
+                    eprintln!("Failed to parse plugin_enabled event data");
+                    None
+                }
+            }
+            "plugin_statuses_changed" => {
+                Some(PlatformEvent::PluginStatusesChanged)
+            }
+            "preferences_deleted" => {
+                let category = ws_event.data.get("category")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let name = ws_event.data.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !category.is_empty() && !name.is_empty() {
+                    Some(PlatformEvent::PreferencesDeleted {
+                        category,
+                        name,
+                    })
+                } else {
+                    eprintln!("Failed to parse preferences_deleted event data");
+                    None
+                }
+            }
+            "response" => {
+                // WebSocket API action response (e.g., from user_typing, get_statuses)
+                let status = ws_event.data.get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("UNKNOWN")
+                    .to_string();
+                let seq_reply = ws_event.data.get("seq_reply")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                let error = ws_event.data.get("error")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+
+                Some(PlatformEvent::Response {
+                    status,
+                    seq_reply,
+                    error,
+                })
+            }
+            "dialog_opened" => {
+                let dialog_id = ws_event.data.get("dialog_id")
+                    .or_else(|| ws_event.data.get("trigger_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !dialog_id.is_empty() {
+                    Some(PlatformEvent::DialogOpened { dialog_id })
+                } else {
+                    eprintln!("Failed to parse dialog_opened event data");
+                    None
+                }
+            }
+            "role_updated" => {
+                let role_id = ws_event.data.get("role_id")
+                    .or_else(|| ws_event.data.get("role").and_then(|r| r.get("id")))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !role_id.is_empty() {
+                    Some(PlatformEvent::RoleUpdated { role_id })
+                } else {
+                    eprintln!("Failed to parse role_updated event data");
+                    None
+                }
+            }
+            "authentication_challenge" => {
+                // Authentication challenge - typically ignored as we send the challenge ourselves
+                // Log for debugging but don't emit an event
+                None
             }
             _ => {
                 // Unknown event type - log for visibility
@@ -1462,5 +1851,643 @@ mod tests {
         } else {
             panic!("Expected ChannelViewed event");
         }
+    }
+
+    #[test]
+    fn test_parse_thread_updated_event() {
+        let json = r#"{
+            "event": "thread_updated",
+            "data": {
+                "thread_id": "thread123"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "channel456",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 52
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse thread_updated event");
+        if let Some(PlatformEvent::ThreadUpdated { thread_id, channel_id }) = platform_event {
+            assert_eq!(thread_id, "thread123");
+            assert_eq!(channel_id, "channel456");
+        } else {
+            panic!("Expected ThreadUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_thread_read_changed_event() {
+        let json = r#"{
+            "event": "thread_read_changed",
+            "data": {
+                "thread_id": "thread123"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "user789",
+                "channel_id": "channel456",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 53
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse thread_read_changed event");
+        if let Some(PlatformEvent::ThreadReadChanged { thread_id, user_id, channel_id }) = platform_event {
+            assert_eq!(thread_id, "thread123");
+            assert_eq!(user_id, "user789");
+            assert_eq!(channel_id, "channel456");
+        } else {
+            panic!("Expected ThreadReadChanged event");
+        }
+    }
+
+    #[test]
+    fn test_parse_thread_follow_changed_event() {
+        let json = r#"{
+            "event": "thread_follow_changed",
+            "data": {
+                "thread_id": "thread123",
+                "state": true
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "user789",
+                "channel_id": "channel456",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 54
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse thread_follow_changed event");
+        if let Some(PlatformEvent::ThreadFollowChanged { thread_id, user_id, channel_id, following }) = platform_event {
+            assert_eq!(thread_id, "thread123");
+            assert_eq!(user_id, "user789");
+            assert_eq!(channel_id, "channel456");
+            assert_eq!(following, true);
+        } else {
+            panic!("Expected ThreadFollowChanged event");
+        }
+    }
+
+    #[test]
+    fn test_parse_post_unread_event() {
+        let json = r#"{
+            "event": "post_unread",
+            "data": {
+                "post_id": "post123",
+                "user_id": "user456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "channel789",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 55
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse post_unread event");
+        if let Some(PlatformEvent::PostUnread { post_id, channel_id, user_id }) = platform_event {
+            assert_eq!(post_id, "post123");
+            assert_eq!(channel_id, "channel789");
+            assert_eq!(user_id, "user456");
+        } else {
+            panic!("Expected PostUnread event");
+        }
+    }
+
+    #[test]
+    fn test_parse_emoji_added_event() {
+        let json = r#"{
+            "event": "emoji_added",
+            "data": {
+                "id": "emoji123",
+                "name": "custom_emoji"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 56
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse emoji_added event");
+        if let Some(PlatformEvent::EmojiAdded { emoji_id, emoji_name }) = platform_event {
+            assert_eq!(emoji_id, "emoji123");
+            assert_eq!(emoji_name, "custom_emoji");
+        } else {
+            panic!("Expected EmojiAdded event");
+        }
+    }
+
+    #[test]
+    fn test_parse_added_to_team_event() {
+        let json = r#"{
+            "event": "added_to_team",
+            "data": {
+                "team_id": "team123",
+                "user_id": "user456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 57
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse added_to_team event");
+        if let Some(PlatformEvent::AddedToTeam { team_id, user_id }) = platform_event {
+            assert_eq!(team_id, "team123");
+            assert_eq!(user_id, "user456");
+        } else {
+            panic!("Expected AddedToTeam event");
+        }
+    }
+
+    #[test]
+    fn test_parse_leave_team_event() {
+        let json = r#"{
+            "event": "leave_team",
+            "data": {
+                "team_id": "team123",
+                "user_id": "user456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 58
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse leave_team event");
+        if let Some(PlatformEvent::LeftTeam { team_id, user_id }) = platform_event {
+            assert_eq!(team_id, "team123");
+            assert_eq!(user_id, "user456");
+        } else {
+            panic!("Expected LeftTeam event");
+        }
+    }
+
+    #[test]
+    fn test_parse_config_changed_event() {
+        let json = r#"{
+            "event": "config_changed",
+            "data": {},
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 59
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse config_changed event");
+        if let Some(PlatformEvent::ConfigChanged) = platform_event {
+            // Success
+        } else {
+            panic!("Expected ConfigChanged event");
+        }
+    }
+
+    #[test]
+    fn test_parse_license_changed_event() {
+        let json = r#"{
+            "event": "license_changed",
+            "data": {},
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 60
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse license_changed event");
+        if let Some(PlatformEvent::LicenseChanged) = platform_event {
+            // Success
+        } else {
+            panic!("Expected LicenseChanged event");
+        }
+    }
+
+    #[test]
+    fn test_parse_channel_converted_event() {
+        let json = r#"{
+            "event": "channel_converted",
+            "data": {},
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "channel123",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 61
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse channel_converted event");
+        if let Some(PlatformEvent::ChannelConverted { channel_id }) = platform_event {
+            assert_eq!(channel_id, "channel123");
+        } else {
+            panic!("Expected ChannelConverted event");
+        }
+    }
+
+    #[test]
+    fn test_parse_channel_member_updated_event() {
+        let json = r#"{
+            "event": "channel_member_updated",
+            "data": {
+                "user_id": "user456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "channel123",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 62
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse channel_member_updated event");
+        if let Some(PlatformEvent::ChannelMemberUpdated { channel_id, user_id }) = platform_event {
+            assert_eq!(channel_id, "channel123");
+            assert_eq!(user_id, "user456");
+        } else {
+            panic!("Expected ChannelMemberUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_delete_team_event() {
+        let json = r#"{
+            "event": "delete_team",
+            "data": {
+                "team_id": "team123"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 63
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse delete_team event");
+        if let Some(PlatformEvent::TeamDeleted { team_id }) = platform_event {
+            assert_eq!(team_id, "team123");
+        } else {
+            panic!("Expected TeamDeleted event");
+        }
+    }
+
+    #[test]
+    fn test_parse_update_team_event() {
+        let json = r#"{
+            "event": "update_team",
+            "data": {
+                "team_id": "team456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 64
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse update_team event");
+        if let Some(PlatformEvent::TeamUpdated { team_id }) = platform_event {
+            assert_eq!(team_id, "team456");
+        } else {
+            panic!("Expected TeamUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_memberrole_updated_event() {
+        let json = r#"{
+            "event": "memberrole_updated",
+            "data": {
+                "user_id": "user789"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "channel456",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 65
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse memberrole_updated event");
+        if let Some(PlatformEvent::MemberRoleUpdated { channel_id, user_id }) = platform_event {
+            assert_eq!(channel_id, "channel456");
+            assert_eq!(user_id, "user789");
+        } else {
+            panic!("Expected MemberRoleUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_plugin_disabled_event() {
+        let json = r#"{
+            "event": "plugin_disabled",
+            "data": {
+                "id": "plugin123"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 66
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse plugin_disabled event");
+        if let Some(PlatformEvent::PluginDisabled { plugin_id }) = platform_event {
+            assert_eq!(plugin_id, "plugin123");
+        } else {
+            panic!("Expected PluginDisabled event");
+        }
+    }
+
+    #[test]
+    fn test_parse_plugin_enabled_event() {
+        let json = r#"{
+            "event": "plugin_enabled",
+            "data": {
+                "id": "plugin456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 67
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse plugin_enabled event");
+        if let Some(PlatformEvent::PluginEnabled { plugin_id }) = platform_event {
+            assert_eq!(plugin_id, "plugin456");
+        } else {
+            panic!("Expected PluginEnabled event");
+        }
+    }
+
+    #[test]
+    fn test_parse_plugin_statuses_changed_event() {
+        let json = r#"{
+            "event": "plugin_statuses_changed",
+            "data": {},
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 68
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse plugin_statuses_changed event");
+        if let Some(PlatformEvent::PluginStatusesChanged) = platform_event {
+            // Success
+        } else {
+            panic!("Expected PluginStatusesChanged event");
+        }
+    }
+
+    #[test]
+    fn test_parse_preferences_deleted_event() {
+        let json = r#"{
+            "event": "preferences_deleted",
+            "data": {
+                "category": "display_settings",
+                "name": "theme"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 69
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse preferences_deleted event");
+        if let Some(PlatformEvent::PreferencesDeleted { category, name }) = platform_event {
+            assert_eq!(category, "display_settings");
+            assert_eq!(name, "theme");
+        } else {
+            panic!("Expected PreferencesDeleted event");
+        }
+    }
+
+    #[test]
+    fn test_parse_response_event() {
+        let json = r#"{
+            "event": "response",
+            "data": {
+                "status": "OK",
+                "seq_reply": 42
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 70
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse response event");
+        if let Some(PlatformEvent::Response { status, seq_reply, error }) = platform_event {
+            assert_eq!(status, "OK");
+            assert_eq!(seq_reply, 42);
+            assert!(error.is_none());
+        } else {
+            panic!("Expected Response event");
+        }
+    }
+
+    #[test]
+    fn test_parse_dialog_opened_event() {
+        let json = r#"{
+            "event": "dialog_opened",
+            "data": {
+                "dialog_id": "dialog123"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 71
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse dialog_opened event");
+        if let Some(PlatformEvent::DialogOpened { dialog_id }) = platform_event {
+            assert_eq!(dialog_id, "dialog123");
+        } else {
+            panic!("Expected DialogOpened event");
+        }
+    }
+
+    #[test]
+    fn test_parse_role_updated_event() {
+        let json = r#"{
+            "event": "role_updated",
+            "data": {
+                "role_id": "role456"
+            },
+            "broadcast": {
+                "omit_users": null,
+                "user_id": "",
+                "channel_id": "",
+                "team_id": "",
+                "connection_id": "",
+                "omit_connection_id": ""
+            },
+            "seq": 72
+        }"#;
+
+        let ws_event: WebSocketEvent = serde_json::from_str(json).expect("Failed to parse WebSocket event");
+        let platform_event = WebSocketManager::convert_event(ws_event);
+
+        assert!(platform_event.is_some(), "Should successfully parse role_updated event");
+        if let Some(PlatformEvent::RoleUpdated { role_id }) = platform_event {
+            assert_eq!(role_id, "role456");
+        } else {
+            panic!("Expected RoleUpdated event");
+        }
+    }
+
+    #[test]
+    fn test_parse_authentication_response() {
+        let json = r#"{
+            "status": "OK",
+            "seq_reply": 1
+        }"#;
+
+        let auth_response: WebSocketAuthResponse = serde_json::from_str(json)
+            .expect("Failed to parse authentication response");
+
+        assert_eq!(auth_response.status, "OK");
+        assert_eq!(auth_response.seq_reply, 1);
     }
 }

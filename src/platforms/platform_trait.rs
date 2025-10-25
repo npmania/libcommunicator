@@ -116,6 +116,86 @@ pub enum PlatformEvent {
         user_id: String,
         channel_id: String,
     },
+    /// A thread was updated (metadata changed)
+    ThreadUpdated {
+        thread_id: String,
+        channel_id: String,
+    },
+    /// Thread read status changed
+    ThreadReadChanged {
+        thread_id: String,
+        user_id: String,
+        channel_id: String,
+    },
+    /// Thread follow status changed
+    ThreadFollowChanged {
+        thread_id: String,
+        user_id: String,
+        channel_id: String,
+        following: bool,
+    },
+    /// A post was marked as unread
+    PostUnread {
+        post_id: String,
+        channel_id: String,
+        user_id: String,
+    },
+    /// A custom emoji was added
+    EmojiAdded {
+        emoji_id: String,
+        emoji_name: String,
+    },
+    /// User was added to a team
+    AddedToTeam {
+        team_id: String,
+        user_id: String,
+    },
+    /// User left a team
+    LeftTeam {
+        team_id: String,
+        user_id: String,
+    },
+    /// Server configuration changed
+    ConfigChanged,
+    /// Server license changed
+    LicenseChanged,
+    /// Channel was converted (e.g., public to private)
+    ChannelConverted { channel_id: String },
+    /// Channel member was updated
+    ChannelMemberUpdated {
+        channel_id: String,
+        user_id: String,
+    },
+    /// Team was deleted
+    TeamDeleted { team_id: String },
+    /// Team was updated
+    TeamUpdated { team_id: String },
+    /// Member role was updated in a channel
+    MemberRoleUpdated {
+        channel_id: String,
+        user_id: String,
+    },
+    /// Plugin was disabled
+    PluginDisabled { plugin_id: String },
+    /// Plugin was enabled
+    PluginEnabled { plugin_id: String },
+    /// Plugin statuses changed
+    PluginStatusesChanged,
+    /// User preferences were deleted
+    PreferencesDeleted {
+        category: String,
+        name: String,
+    },
+    /// WebSocket action response
+    Response {
+        status: String,
+        seq_reply: i64,
+        error: Option<String>,
+    },
+    /// Dialog was opened
+    DialogOpened { dialog_id: String },
+    /// Role was updated
+    RoleUpdated { role_id: String },
 }
 
 /// Trait that all platform adapters must implement

@@ -1661,6 +1661,145 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
+                PlatformEvent::ThreadUpdated { thread_id, channel_id } => {
+                    serde_json::json!({
+                        "type": "thread_updated",
+                        "thread_id": thread_id,
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::ThreadReadChanged { thread_id, user_id, channel_id } => {
+                    serde_json::json!({
+                        "type": "thread_read_changed",
+                        "thread_id": thread_id,
+                        "user_id": user_id,
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::ThreadFollowChanged { thread_id, user_id, channel_id, following } => {
+                    serde_json::json!({
+                        "type": "thread_follow_changed",
+                        "thread_id": thread_id,
+                        "user_id": user_id,
+                        "channel_id": channel_id,
+                        "following": following
+                    })
+                }
+                PlatformEvent::PostUnread { post_id, channel_id, user_id } => {
+                    serde_json::json!({
+                        "type": "post_unread",
+                        "post_id": post_id,
+                        "channel_id": channel_id,
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::EmojiAdded { emoji_id, emoji_name } => {
+                    serde_json::json!({
+                        "type": "emoji_added",
+                        "emoji_id": emoji_id,
+                        "emoji_name": emoji_name
+                    })
+                }
+                PlatformEvent::AddedToTeam { team_id, user_id } => {
+                    serde_json::json!({
+                        "type": "added_to_team",
+                        "team_id": team_id,
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::LeftTeam { team_id, user_id } => {
+                    serde_json::json!({
+                        "type": "left_team",
+                        "team_id": team_id,
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::ConfigChanged => {
+                    serde_json::json!({
+                        "type": "config_changed"
+                    })
+                }
+                PlatformEvent::LicenseChanged => {
+                    serde_json::json!({
+                        "type": "license_changed"
+                    })
+                }
+                PlatformEvent::ChannelConverted { channel_id } => {
+                    serde_json::json!({
+                        "type": "channel_converted",
+                        "channel_id": channel_id
+                    })
+                }
+                PlatformEvent::ChannelMemberUpdated { channel_id, user_id } => {
+                    serde_json::json!({
+                        "type": "channel_member_updated",
+                        "channel_id": channel_id,
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::TeamDeleted { team_id } => {
+                    serde_json::json!({
+                        "type": "team_deleted",
+                        "team_id": team_id
+                    })
+                }
+                PlatformEvent::TeamUpdated { team_id } => {
+                    serde_json::json!({
+                        "type": "team_updated",
+                        "team_id": team_id
+                    })
+                }
+                PlatformEvent::MemberRoleUpdated { channel_id, user_id } => {
+                    serde_json::json!({
+                        "type": "member_role_updated",
+                        "channel_id": channel_id,
+                        "user_id": user_id
+                    })
+                }
+                PlatformEvent::PluginDisabled { plugin_id } => {
+                    serde_json::json!({
+                        "type": "plugin_disabled",
+                        "plugin_id": plugin_id
+                    })
+                }
+                PlatformEvent::PluginEnabled { plugin_id } => {
+                    serde_json::json!({
+                        "type": "plugin_enabled",
+                        "plugin_id": plugin_id
+                    })
+                }
+                PlatformEvent::PluginStatusesChanged => {
+                    serde_json::json!({
+                        "type": "plugin_statuses_changed"
+                    })
+                }
+                PlatformEvent::PreferencesDeleted { category, name } => {
+                    serde_json::json!({
+                        "type": "preferences_deleted",
+                        "category": category,
+                        "name": name
+                    })
+                }
+                PlatformEvent::Response { status, seq_reply, error } => {
+                    serde_json::json!({
+                        "type": "response",
+                        "status": status,
+                        "seq_reply": seq_reply,
+                        "error": error
+                    })
+                }
+                PlatformEvent::DialogOpened { dialog_id } => {
+                    serde_json::json!({
+                        "type": "dialog_opened",
+                        "dialog_id": dialog_id
+                    })
+                }
+                PlatformEvent::RoleUpdated { role_id } => {
+                    serde_json::json!({
+                        "type": "role_updated",
+                        "role_id": role_id
+                    })
+                }
             };
 
             match serde_json::to_string(&json) {

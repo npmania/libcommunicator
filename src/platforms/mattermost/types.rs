@@ -297,6 +297,13 @@ pub struct WebSocketAuthData {
     pub token: String,
 }
 
+/// WebSocket authentication response
+#[derive(Debug, Clone, Deserialize)]
+pub struct WebSocketAuthResponse {
+    pub status: String,
+    pub seq_reply: i64,
+}
+
 /// Status object for user presence
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Status {
