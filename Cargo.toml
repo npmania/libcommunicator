@@ -1,0 +1,10 @@
+[package]
+name = "libcommunicator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "communicator"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
