@@ -5,10 +5,14 @@ use std::os::raw::{c_char, c_void};
 pub mod context;
 pub mod error;
 pub mod platforms;
+pub mod runtime;
+pub mod types;
 
 // Re-exports for convenience
 pub use context::{Context, LogCallback, LogLevel};
 pub use error::{Error, ErrorCode, Result};
+pub use platforms::{Platform, PlatformConfig, PlatformEvent};
+pub use types::{Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Message, User};
 
 // Library version information
 pub const VERSION_MAJOR: u32 = 0;
@@ -80,13 +84,16 @@ pub extern "C" fn communicator_free_string(s: *mut c_char) {
 #[no_mangle]
 pub extern "C" fn communicator_init() -> ErrorCode {
     error::clear_last_error();
-    // In a real implementation, this might:
-    // - Initialize logging systems
-    // - Set up thread pools
-    // - Register signal handlers
-    // - Load configuration files
-    // For now, it's a no-op that always succeeds
-    ErrorCode::Success
+
+    // Initialize the async runtime
+    match runtime::init_runtime() {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
 }
 
 /// FFI function: Cleanup the library
@@ -95,12 +102,9 @@ pub extern "C" fn communicator_init() -> ErrorCode {
 #[no_mangle]
 pub extern "C" fn communicator_cleanup() {
     error::clear_last_error();
-    // In a real implementation, this might:
-    // - Flush and close log files
-    // - Shutdown thread pools
-    // - Free global caches
-    // - Disconnect any remaining connections
-    // For now, it's a no-op
+
+    // Shutdown the async runtime
+    runtime::shutdown_runtime();
 }
 
 // ============================================================================
