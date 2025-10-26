@@ -561,6 +561,10 @@ impl Platform for MattermostPlatform {
         Ok(())
     }
 
+    // ========================================================================
+    // File Operations
+    // ========================================================================
+
     async fn upload_file(&self, channel_id: &str, file_path: &std::path::Path) -> Result<String> {
         let file_info = self.client.upload_file(channel_id, file_path, None).await?;
         Ok(file_info.id)
@@ -582,6 +586,82 @@ impl Platform for MattermostPlatform {
 
     async fn get_file_thumbnail(&self, file_id: &str) -> Result<Vec<u8>> {
         self.client.get_file_thumbnail(file_id).await
+    }
+
+    // ========================================================================
+    // Thread Operations
+    // ========================================================================
+
+    async fn get_thread(&self, post_id: &str) -> Result<Vec<Message>> {
+        let post_list = self.client.get_thread(post_id).await?;
+
+        // Convert posts to messages
+        let mut messages = Vec::new();
+        for post_id in &post_list.order {
+            if let Some(post) = post_list.posts.get(post_id) {
+                messages.push(post.clone().into());
+            }
+        }
+
+        Ok(messages)
+    }
+
+    async fn follow_thread(&self, thread_id: &str) -> Result<()> {
+        let user_id = "me"; // Use "me" to refer to current user
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        self.client
+            .follow_thread(user_id, &team_id, thread_id)
+            .await
+    }
+
+    async fn unfollow_thread(&self, thread_id: &str) -> Result<()> {
+        let user_id = "me"; // Use "me" to refer to current user
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        self.client
+            .unfollow_thread(user_id, &team_id, thread_id)
+            .await
+    }
+
+    async fn mark_thread_read(&self, thread_id: &str) -> Result<()> {
+        let user_id = "me"; // Use "me" to refer to current user
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        // Use current timestamp
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+
+        self.client
+            .mark_thread_as_read(user_id, &team_id, thread_id, timestamp)
+            .await
+    }
+
+    async fn mark_thread_unread(&self, thread_id: &str, post_id: &str) -> Result<()> {
+        let user_id = "me"; // Use "me" to refer to current user
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        self.client
+            .mark_thread_as_unread(user_id, &team_id, thread_id, post_id)
+            .await
     }
 }
 

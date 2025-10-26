@@ -1027,6 +1027,104 @@ func (p *Platform) SetTeamID(teamID string) error {
 	return nil
 }
 
+// ==============================================================================
+// Thread Operations
+// ==============================================================================
+
+// GetThread fetches a thread (root post and all replies)
+func (p *Platform) GetThread(postID string) ([]Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csPostID, freePostID := cStringFree(postID)
+	defer freePostID()
+
+	cstr := C.communicator_platform_get_thread(p.handle, csPostID)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var messages []Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+// FollowThread makes the authenticated user follow a thread
+func (p *Platform) FollowThread(threadID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csThreadID, freeThreadID := cStringFree(threadID)
+	defer freeThreadID()
+
+	result := C.communicator_platform_follow_thread(p.handle, csThreadID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// UnfollowThread makes the authenticated user unfollow a thread
+func (p *Platform) UnfollowThread(threadID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csThreadID, freeThreadID := cStringFree(threadID)
+	defer freeThreadID()
+
+	result := C.communicator_platform_unfollow_thread(p.handle, csThreadID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// MarkThreadRead marks a thread as read up to the current time
+func (p *Platform) MarkThreadRead(threadID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csThreadID, freeThreadID := cStringFree(threadID)
+	defer freeThreadID()
+
+	result := C.communicator_platform_mark_thread_read(p.handle, csThreadID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// MarkThreadUnread marks a thread as unread from a specific post
+func (p *Platform) MarkThreadUnread(threadID, postID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csThreadID, freeThreadID := cStringFree(threadID)
+	defer freeThreadID()
+
+	csPostID, freePostID := cStringFree(postID)
+	defer freePostID()
+
+	result := C.communicator_platform_mark_thread_unread(p.handle, csThreadID, csPostID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
 // Destroy destroys the platform and frees its resources
 func (p *Platform) Destroy() {
 	if p.handle != nil {

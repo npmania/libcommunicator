@@ -3527,6 +3527,239 @@ pub unsafe extern "C" fn communicator_free_file_data(data: *mut u8, size: usize)
 }
 
 // ============================================================================
+// Thread Operations
+// ============================================================================
+
+/// FFI function: Get a thread (root post and all replies)
+/// Returns a JSON string containing an array of messages
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+/// The returned string must be freed using communicator_free_string.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_thread(
+    handle: PlatformHandle,
+    post_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || post_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let post_id_str = {
+        match std::ffi::CStr::from_ptr(post_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_thread(post_id_str)) {
+        Ok(messages) => match serde_json::to_string(&messages) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to create C string from thread JSON",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize thread: {e}"),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Start following a thread
+/// Returns error code indicating success or failure
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_follow_thread(
+    handle: PlatformHandle,
+    thread_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || thread_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let thread_id_str = {
+        match std::ffi::CStr::from_ptr(thread_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.follow_thread(thread_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Stop following a thread
+/// Returns error code indicating success or failure
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_unfollow_thread(
+    handle: PlatformHandle,
+    thread_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || thread_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let thread_id_str = {
+        match std::ffi::CStr::from_ptr(thread_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.unfollow_thread(thread_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Mark a thread as read
+/// Returns error code indicating success or failure
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_mark_thread_read(
+    handle: PlatformHandle,
+    thread_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || thread_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let thread_id_str = {
+        match std::ffi::CStr::from_ptr(thread_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.mark_thread_read(thread_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Mark a thread as unread from a specific post
+/// Returns error code indicating success or failure
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_mark_thread_unread(
+    handle: PlatformHandle,
+    thread_id: *const c_char,
+    post_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || thread_id.is_null() || post_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let thread_id_str = {
+        match std::ffi::CStr::from_ptr(thread_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let post_id_str = {
+        match std::ffi::CStr::from_ptr(post_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.mark_thread_unread(thread_id_str, post_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 
