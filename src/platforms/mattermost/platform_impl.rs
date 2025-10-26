@@ -4,9 +4,10 @@ use tokio::sync::Mutex;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::{Platform, PlatformConfig, PlatformEvent};
-use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
+use crate::types::{Attachment, Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 
 use super::client::MattermostClient;
+use super::convert::ConversionContext;
 use super::websocket::WebSocketManager;
 
 /// Wrapper struct that implements the Platform trait for Mattermost
@@ -558,6 +559,29 @@ impl Platform for MattermostPlatform {
     async fn set_team_id(&self, team_id: Option<String>) -> Result<()> {
         self.client.set_team_id(team_id).await;
         Ok(())
+    }
+
+    async fn upload_file(&self, channel_id: &str, file_path: &std::path::Path) -> Result<String> {
+        let file_info = self.client.upload_file(channel_id, file_path, None).await?;
+        Ok(file_info.id)
+    }
+
+    async fn download_file(&self, file_id: &str) -> Result<Vec<u8>> {
+        self.client.download_file(file_id).await
+    }
+
+    async fn get_file_metadata(&self, file_id: &str) -> Result<Attachment> {
+        let file_info = self.client.get_file_info(file_id).await?;
+        // Convert FileInfo to Attachment using context
+        let ctx = ConversionContext {
+            server_url: self.client.get_base_url().to_string(),
+            current_user_id: self.client.get_user_id().await,
+        };
+        Ok(file_info.to_attachment_with_context(&ctx))
+    }
+
+    async fn get_file_thumbnail(&self, file_id: &str) -> Result<Vec<u8>> {
+        self.client.get_file_thumbnail(file_id).await
     }
 }
 

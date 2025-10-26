@@ -3256,6 +3256,280 @@ pub unsafe extern "C" fn communicator_platform_set_team_id(
     }
 }
 
+// ============================================================================
+// File Operations FFI Functions
+// ============================================================================
+
+/// FFI function: Upload a file to a channel
+/// Returns a dynamically allocated string containing the file ID
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+///
+/// # Arguments
+/// * `handle` - The platform handle
+/// * `channel_id` - The channel ID where the file will be uploaded
+/// * `file_path` - Path to the file to upload
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_upload_file(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    file_path: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || file_path.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let file_path_str = {
+        match std::ffi::CStr::from_ptr(file_path).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+    let path = std::path::Path::new(file_path_str);
+
+    match runtime::block_on(platform.upload_file(channel_id_str, path)) {
+        Ok(file_id) => match CString::new(file_id) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    "Failed to convert file ID to C string",
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Download a file by its ID
+/// The file data is returned through the out_data and out_size parameters
+/// The caller must free the returned data using communicator_free_file_data()
+/// Returns ErrorCode indicating success or failure
+///
+/// # Arguments
+/// * `handle` - The platform handle
+/// * `file_id` - The ID of the file to download
+/// * `out_data` - Output parameter for the file data (caller must free with communicator_free_file_data)
+/// * `out_size` - Output parameter for the size of the file data in bytes
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_download_file(
+    handle: PlatformHandle,
+    file_id: *const c_char,
+    out_data: *mut *mut u8,
+    out_size: *mut usize,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || file_id.is_null() || out_data.is_null() || out_size.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let file_id_str = {
+        match std::ffi::CStr::from_ptr(file_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.download_file(file_id_str)) {
+        Ok(data) => {
+            let size = data.len();
+            let boxed_data = data.into_boxed_slice();
+            let raw_ptr = Box::into_raw(boxed_data) as *mut u8;
+
+            *out_data = raw_ptr;
+            *out_size = size;
+            ErrorCode::Success
+        }
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get file metadata without downloading the file
+/// Returns a JSON string representing the Attachment metadata
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+///
+/// # Arguments
+/// * `handle` - The platform handle
+/// * `file_id` - The ID of the file
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_file_metadata(
+    handle: PlatformHandle,
+    file_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || file_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let file_id_str = {
+        match std::ffi::CStr::from_ptr(file_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_file_metadata(file_id_str)) {
+        Ok(attachment) => match serde_json::to_string(&attachment) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert metadata to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize metadata: {e}"),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get file thumbnail
+/// The thumbnail data is returned through the out_data and out_size parameters
+/// The caller must free the returned data using communicator_free_file_data()
+/// Returns ErrorCode indicating success or failure
+///
+/// # Arguments
+/// * `handle` - The platform handle
+/// * `file_id` - The ID of the file
+/// * `out_data` - Output parameter for the thumbnail data (caller must free with communicator_free_file_data)
+/// * `out_size` - Output parameter for the size of the thumbnail data in bytes
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_file_thumbnail(
+    handle: PlatformHandle,
+    file_id: *const c_char,
+    out_data: *mut *mut u8,
+    out_size: *mut usize,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || file_id.is_null() || out_data.is_null() || out_size.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let file_id_str = {
+        match std::ffi::CStr::from_ptr(file_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_file_thumbnail(file_id_str)) {
+        Ok(data) => {
+            let size = data.len();
+            let boxed_data = data.into_boxed_slice();
+            let raw_ptr = Box::into_raw(boxed_data) as *mut u8;
+
+            *out_data = raw_ptr;
+            *out_size = size;
+            ErrorCode::Success
+        }
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Free file data allocated by download_file or get_file_thumbnail
+///
+/// # Arguments
+/// * `data` - Pointer to file data returned by communicator_platform_download_file or communicator_platform_get_file_thumbnail
+/// * `size` - Size of the data in bytes (as returned in out_size)
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure the data pointer was allocated by this library and has not been freed already.
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_free_file_data(data: *mut u8, size: usize) {
+    if !data.is_null() && size > 0 {
+        let _ = Box::from_raw(std::slice::from_raw_parts_mut(data, size));
+    }
+}
+
+// ============================================================================
+// Platform Cleanup
+// ============================================================================
+
 /// FFI function: Destroy a platform and free its memory
 /// After calling this, the handle is invalid and must not be used
 ///

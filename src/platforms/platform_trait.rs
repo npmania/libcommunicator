@@ -689,6 +689,76 @@ pub trait Platform: Send + Sync {
         let _ = team_id;
         Err(crate::error::Error::unsupported("Setting team ID not supported by this platform"))
     }
+
+    // ========================================================================
+    // File Operations
+    // ========================================================================
+
+    /// Upload a file to a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID where the file will be uploaded
+    /// * `file_path` - Path to the file to upload
+    ///
+    /// # Returns
+    /// The file ID of the uploaded file, which can be used to attach the file to a message
+    ///
+    /// # Notes
+    /// Not all platforms support file uploads. Check `capabilities().supports_file_attachments` first.
+    /// The file is uploaded to the server but not yet attached to a message. Use the returned file ID
+    /// when sending a message to attach the file.
+    async fn upload_file(&self, channel_id: &str, file_path: &std::path::Path) -> Result<String> {
+        let _ = (channel_id, file_path);
+        Err(crate::error::Error::unsupported("File uploads not supported by this platform"))
+    }
+
+    /// Download a file by its ID
+    ///
+    /// # Arguments
+    /// * `file_id` - The ID of the file to download
+    ///
+    /// # Returns
+    /// The file contents as bytes
+    ///
+    /// # Notes
+    /// Not all platforms support file downloads. Check `capabilities().supports_file_attachments` first.
+    async fn download_file(&self, file_id: &str) -> Result<Vec<u8>> {
+        let _ = file_id;
+        Err(crate::error::Error::unsupported("File downloads not supported by this platform"))
+    }
+
+    /// Get metadata for a file without downloading it
+    ///
+    /// # Arguments
+    /// * `file_id` - The ID of the file
+    ///
+    /// # Returns
+    /// Attachment metadata including filename, size, MIME type, etc.
+    ///
+    /// # Notes
+    /// This allows checking file information without downloading the full file content.
+    /// Not all platforms support this operation. Check `capabilities().supports_file_attachments` first.
+    async fn get_file_metadata(&self, file_id: &str) -> Result<crate::types::Attachment> {
+        let _ = file_id;
+        Err(crate::error::Error::unsupported("File metadata not supported by this platform"))
+    }
+
+    /// Download a thumbnail for a file
+    ///
+    /// # Arguments
+    /// * `file_id` - The ID of the file
+    ///
+    /// # Returns
+    /// The thumbnail image as bytes
+    ///
+    /// # Notes
+    /// Thumbnails are typically only available for image and video files.
+    /// The operation will return an error if the file doesn't have a thumbnail.
+    /// Not all platforms support thumbnails.
+    async fn get_file_thumbnail(&self, file_id: &str) -> Result<Vec<u8>> {
+        let _ = file_id;
+        Err(crate::error::Error::unsupported("File thumbnails not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

@@ -168,6 +168,11 @@ impl MattermostClient {
         })
     }
 
+    /// Get the base URL of the Mattermost server
+    pub fn get_base_url(&self) -> &str {
+        self.base_url.as_str()
+    }
+
     /// Update the connection state
     pub async fn set_state(&self, state: ConnectionState) {
         let mut s = self.state.write().await;

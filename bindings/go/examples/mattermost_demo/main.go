@@ -211,6 +211,72 @@ func main() {
 	*/
 
 	// ========================================================================
+	// Optional: File operations (uncomment to test)
+	// ========================================================================
+	/*
+	if len(channels) > 0 {
+		fmt.Println("12. Testing file operations...")
+
+		// Upload a file
+		fmt.Println("   Uploading a test file...")
+		testFilePath := "/path/to/your/test-file.txt" // Change this to an actual file path
+		fileID, err := platform.UploadFile(channels[0].ID, testFilePath)
+		if err != nil {
+			log.Printf("Failed to upload file: %v", err)
+		} else {
+			fmt.Printf("   ✓ File uploaded with ID: %s\n", fileID)
+
+			// Get file metadata
+			fmt.Println("\n   Getting file metadata...")
+			metadata, err := platform.GetFileMetadata(fileID)
+			if err != nil {
+				log.Printf("Failed to get file metadata: %v", err)
+			} else {
+				metadataJSON, _ := json.MarshalIndent(metadata, "      ", "  ")
+				fmt.Printf("   File Metadata: %s\n", string(metadataJSON))
+				fmt.Println("   ✓ Got file metadata")
+			}
+
+			// Download the file
+			fmt.Println("\n   Downloading file...")
+			fileData, err := platform.DownloadFile(fileID)
+			if err != nil {
+				log.Printf("Failed to download file: %v", err)
+			} else {
+				fmt.Printf("   ✓ Downloaded file (%d bytes)\n", len(fileData))
+
+				// Optionally save the downloaded file
+				// err := os.WriteFile("downloaded-file.txt", fileData, 0644)
+				// if err != nil {
+				//     log.Printf("Failed to save file: %v", err)
+				// } else {
+				//     fmt.Println("   ✓ Saved file to downloaded-file.txt")
+				// }
+			}
+
+			// Get file thumbnail (for images/videos)
+			fmt.Println("\n   Getting file thumbnail (if available)...")
+			thumbnailData, err := platform.GetFileThumbnail(fileID)
+			if err != nil {
+				log.Printf("Thumbnail not available or failed: %v", err)
+			} else {
+				fmt.Printf("   ✓ Downloaded thumbnail (%d bytes)\n", len(thumbnailData))
+
+				// Optionally save the thumbnail
+				// err := os.WriteFile("thumbnail.jpg", thumbnailData, 0644)
+				// if err != nil {
+				//     log.Printf("Failed to save thumbnail: %v", err)
+				// } else {
+				//     fmt.Println("   ✓ Saved thumbnail to thumbnail.jpg")
+				// }
+			}
+
+			fmt.Println()
+		}
+	}
+	*/
+
+	// ========================================================================
 	// Disconnect
 	// ========================================================================
 	fmt.Println("10. Disconnecting...")
