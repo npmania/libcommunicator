@@ -187,7 +187,7 @@ impl Platform for MattermostPlatform {
     }
 
     async fn get_channel(&self, channel_id: &str) -> Result<Channel> {
-        let mm_channel = self.client.get_channel(channel_id).await?;
+        let mm_channel = self.client.get_channel_cached(channel_id).await?;
         let current_user_id = self.client.get_user_id().await;
         self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
     }
@@ -212,20 +212,22 @@ impl Platform for MattermostPlatform {
     async fn get_channel_members(&self, channel_id: &str) -> Result<Vec<User>> {
         let mm_members = self.client.get_channel_members(channel_id).await?;
 
-        // Fetch user details for each member
-        let mut users = Vec::new();
-        for member in mm_members {
-            if let Ok(mm_user) = self.client.get_user(&member.user_id).await {
-                users.push(mm_user.into());
-                // Continue with other users even if one fails
-            }
-        }
+        // Collect all user IDs
+        let user_ids: Vec<String> = mm_members.iter()
+            .map(|m| m.user_id.clone())
+            .collect();
 
-        Ok(users)
+        // Use batch cached fetch - this is MUCH more efficient than N individual calls
+        // If users are cached, this makes zero API calls
+        // Otherwise, it makes one batch API call for all uncached users
+        let mm_users = self.client.get_users_by_ids_cached(&user_ids).await?;
+
+        // Convert to User type
+        Ok(mm_users.into_iter().map(|u| u.into()).collect())
     }
 
     async fn get_user(&self, user_id: &str) -> Result<User> {
-        let mm_user = self.client.get_user(user_id).await?;
+        let mm_user = self.client.get_user_cached(user_id).await?;
         Ok(mm_user.into())
     }
 
@@ -246,7 +248,7 @@ impl Platform for MattermostPlatform {
     }
 
     async fn get_team(&self, team_id: &str) -> Result<Team> {
-        let mm_team = self.client.get_team(team_id).await?;
+        let mm_team = self.client.get_team_cached(team_id).await?;
         Ok(mm_team.into())
     }
 
@@ -313,8 +315,39 @@ impl Platform for MattermostPlatform {
         if let Some(ws) = ws_lock.as_ref() {
             // Poll from the WebSocket manager
             if let Some(event) = ws.poll_event().await {
-                // Convert the internal event to PlatformEvent
-                // Note: The websocket module already returns PlatformEvent
+                // Invalidate caches based on event type
+                match &event {
+                    // User events - invalidate user cache
+                    PlatformEvent::UserUpdated { user_id } => {
+                        self.client.invalidate_user_cache(user_id).await;
+                    }
+                    PlatformEvent::UserRoleUpdated { user_id } => {
+                        self.client.invalidate_user_cache(user_id).await;
+                    }
+
+                    // Channel events - invalidate channel cache
+                    PlatformEvent::ChannelCreated(channel) => {
+                        self.client.invalidate_channel_cache(&channel.id).await;
+                    }
+                    PlatformEvent::ChannelUpdated(channel) => {
+                        self.client.invalidate_channel_cache(&channel.id).await;
+                    }
+                    PlatformEvent::ChannelDeleted { channel_id } => {
+                        self.client.invalidate_channel_cache(channel_id).await;
+                    }
+
+                    // Team events - clear team cache (structural changes)
+                    PlatformEvent::AddedToTeam { team_id, .. } => {
+                        self.client.invalidate_team_cache(team_id).await;
+                    }
+                    PlatformEvent::LeftTeam { team_id, .. } => {
+                        self.client.invalidate_team_cache(team_id).await;
+                    }
+
+                    // Other events don't require cache invalidation
+                    _ => {}
+                }
+
                 return Ok(Some(event));
             }
         }

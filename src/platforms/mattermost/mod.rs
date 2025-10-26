@@ -5,6 +5,7 @@
 //! `api-spec.yaml` in this directory.
 
 mod auth;
+mod cache;
 mod channels;
 mod client;
 mod convert;
@@ -17,6 +18,7 @@ mod types;
 mod users;
 mod websocket;
 
+pub use cache::Cache;
 pub use client::{MattermostClient, RateLimitInfo};
 pub use convert::{status_string_to_user_status, user_status_to_status_string};
 pub use platform_impl::MattermostPlatform;

@@ -1,10 +1,48 @@
 use reqwest::Client;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use url::Url;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::types::{ConnectionInfo, ConnectionState};
+
+use super::cache::Cache;
+use super::types::{MattermostChannel, MattermostTeam, MattermostUser};
+
+/// Configuration for caching API responses
+#[derive(Debug, Clone)]
+pub struct CacheConfig {
+    /// Time-to-live for user cache entries (default: 5 minutes)
+    pub user_ttl: Duration,
+    /// Time-to-live for channel cache entries (default: 2 minutes)
+    pub channel_ttl: Duration,
+    /// Time-to-live for team cache entries (default: 10 minutes)
+    pub team_ttl: Duration,
+    /// Enable caching (default: true)
+    pub enable_cache: bool,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            user_ttl: Duration::from_secs(300),    // 5 minutes
+            channel_ttl: Duration::from_secs(120), // 2 minutes
+            team_ttl: Duration::from_secs(600),    // 10 minutes
+            enable_cache: true,
+        }
+    }
+}
+
+impl CacheConfig {
+    /// Create a configuration with caching disabled
+    pub fn disabled() -> Self {
+        Self {
+            enable_cache: false,
+            ..Default::default()
+        }
+    }
+}
 
 /// Rate limit information from Mattermost API response headers
 #[derive(Debug, Clone)]
@@ -33,6 +71,14 @@ pub struct MattermostClient {
     user_id: Arc<RwLock<Option<String>>>,
     /// Rate limit information from last API response
     rate_limit_info: Arc<RwLock<Option<RateLimitInfo>>>,
+    /// Cache for user objects
+    user_cache: Cache<MattermostUser>,
+    /// Cache for channel objects
+    channel_cache: Cache<MattermostChannel>,
+    /// Cache for team objects
+    team_cache: Cache<MattermostTeam>,
+    /// Cache configuration
+    cache_config: CacheConfig,
 }
 
 impl MattermostClient {
@@ -44,6 +90,18 @@ impl MattermostClient {
     /// # Returns
     /// A Result containing the MattermostClient or an Error
     pub fn new(base_url: &str) -> Result<Self> {
+        Self::with_cache_config(base_url, CacheConfig::default())
+    }
+
+    /// Create a new Mattermost client with custom cache configuration
+    ///
+    /// # Arguments
+    /// * `base_url` - The base URL of the Mattermost server
+    /// * `cache_config` - Cache configuration
+    ///
+    /// # Returns
+    /// A Result containing the MattermostClient or an Error
+    pub fn with_cache_config(base_url: &str, cache_config: CacheConfig) -> Result<Self> {
         let base_url = Url::parse(base_url)
             .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Invalid URL: {e}")))?;
 
@@ -60,6 +118,10 @@ impl MattermostClient {
             team_id: Arc::new(RwLock::new(None)),
             user_id: Arc::new(RwLock::new(None)),
             rate_limit_info: Arc::new(RwLock::new(None)),
+            user_cache: Cache::new(cache_config.user_ttl),
+            channel_cache: Cache::new(cache_config.channel_ttl),
+            team_cache: Cache::new(cache_config.team_ttl),
+            cache_config,
         })
     }
 
@@ -452,6 +514,215 @@ impl MattermostClient {
         let endpoint = format!("/emoji/name/{}", emoji_name);
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
+    }
+
+    // ========================================================================
+    // Cached API Methods
+    // ========================================================================
+
+    /// Get a user by ID with caching
+    ///
+    /// Checks the cache first. If not found or expired, fetches from the API
+    /// and stores in cache before returning.
+    ///
+    /// # Arguments
+    /// * `user_id` - The ID of the user to retrieve
+    ///
+    /// # Returns
+    /// A Result containing the user information or an Error
+    pub async fn get_user_cached(&self, user_id: &str) -> Result<MattermostUser> {
+        // Return early if caching is disabled
+        if !self.cache_config.enable_cache {
+            return self.get_user(user_id).await;
+        }
+
+        // Check cache first
+        if let Some(user) = self.user_cache.get(user_id).await {
+            return Ok(user);
+        }
+
+        // Cache miss - fetch from API
+        let user = self.get_user(user_id).await?;
+
+        // Store in cache before returning
+        self.user_cache.set(user_id.to_string(), user.clone()).await;
+
+        Ok(user)
+    }
+
+    /// Get a channel by ID with caching
+    ///
+    /// Checks the cache first. If not found or expired, fetches from the API
+    /// and stores in cache before returning.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to retrieve
+    ///
+    /// # Returns
+    /// A Result containing the channel information or an Error
+    pub async fn get_channel_cached(&self, channel_id: &str) -> Result<MattermostChannel> {
+        // Return early if caching is disabled
+        if !self.cache_config.enable_cache {
+            return self.get_channel(channel_id).await;
+        }
+
+        // Check cache first
+        if let Some(channel) = self.channel_cache.get(channel_id).await {
+            return Ok(channel);
+        }
+
+        // Cache miss - fetch from API
+        let channel = self.get_channel(channel_id).await?;
+
+        // Store in cache before returning
+        self.channel_cache.set(channel_id.to_string(), channel.clone()).await;
+
+        Ok(channel)
+    }
+
+    /// Get a team by ID with caching
+    ///
+    /// Checks the cache first. If not found or expired, fetches from the API
+    /// and stores in cache before returning.
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team to retrieve
+    ///
+    /// # Returns
+    /// A Result containing the team information or an Error
+    pub async fn get_team_cached(&self, team_id: &str) -> Result<MattermostTeam> {
+        // Return early if caching is disabled
+        if !self.cache_config.enable_cache {
+            return self.get_team(team_id).await;
+        }
+
+        // Check cache first
+        if let Some(team) = self.team_cache.get(team_id).await {
+            return Ok(team);
+        }
+
+        // Cache miss - fetch from API
+        let team = self.get_team(team_id).await?;
+
+        // Store in cache before returning
+        self.team_cache.set(team_id.to_string(), team.clone()).await;
+
+        Ok(team)
+    }
+
+    /// Get multiple users by their IDs with caching
+    ///
+    /// This method intelligently uses the cache to minimize API calls:
+    /// 1. Checks cache for all requested users
+    /// 2. Only fetches uncached users from the API
+    /// 3. Caches newly fetched users
+    /// 4. Returns all users in the order requested
+    ///
+    /// # Arguments
+    /// * `user_ids` - A list of user IDs to retrieve
+    ///
+    /// # Returns
+    /// A Result containing a list of users or an Error
+    ///
+    /// # Performance
+    /// If all users are cached, this makes zero API calls.
+    /// Otherwise, it makes one batch API call for all uncached users.
+    pub async fn get_users_by_ids_cached(&self, user_ids: &[String]) -> Result<Vec<MattermostUser>> {
+        // Return early if caching is disabled
+        if !self.cache_config.enable_cache {
+            return self.get_users_by_ids(user_ids).await;
+        }
+
+        let mut result = Vec::with_capacity(user_ids.len());
+        let mut uncached_ids = Vec::new();
+
+        // Check cache for each user
+        for user_id in user_ids {
+            if let Some(user) = self.user_cache.get(user_id).await {
+                result.push((user_id.clone(), user));
+            } else {
+                uncached_ids.push(user_id.clone());
+            }
+        }
+
+        // If there are uncached users, fetch them from API
+        if !uncached_ids.is_empty() {
+            let fetched_users = self.get_users_by_ids(&uncached_ids).await?;
+
+            // Cache the newly fetched users and add to result
+            for user in fetched_users {
+                self.user_cache.set(user.id.clone(), user.clone()).await;
+                result.push((user.id.clone(), user));
+            }
+        }
+
+        // Sort result to match the order of input user_ids
+        let user_map: std::collections::HashMap<String, MattermostUser> =
+            result.into_iter().collect();
+
+        let ordered_result: Vec<MattermostUser> = user_ids
+            .iter()
+            .filter_map(|id| user_map.get(id).cloned())
+            .collect();
+
+        Ok(ordered_result)
+    }
+
+    /// Invalidate a user in the cache
+    ///
+    /// This is typically called when a WebSocket event indicates
+    /// that the user has been updated.
+    ///
+    /// # Arguments
+    /// * `user_id` - The ID of the user to invalidate
+    pub async fn invalidate_user_cache(&self, user_id: &str) {
+        self.user_cache.invalidate(user_id).await;
+    }
+
+    /// Invalidate a channel in the cache
+    ///
+    /// This is typically called when a WebSocket event indicates
+    /// that the channel has been updated or deleted.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to invalidate
+    pub async fn invalidate_channel_cache(&self, channel_id: &str) {
+        self.channel_cache.invalidate(channel_id).await;
+    }
+
+    /// Invalidate a team in the cache
+    ///
+    /// This is typically called when a WebSocket event indicates
+    /// that the team has been updated.
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team to invalidate
+    pub async fn invalidate_team_cache(&self, team_id: &str) {
+        self.team_cache.invalidate(team_id).await;
+    }
+
+    /// Clear all caches
+    ///
+    /// This is useful when major changes occur (e.g., user logout/login,
+    /// team changes) that may affect many cached entries.
+    pub async fn clear_all_caches(&self) {
+        self.user_cache.clear().await;
+        self.channel_cache.clear().await;
+        self.team_cache.clear().await;
+    }
+
+    /// Get cache statistics
+    ///
+    /// Returns statistics for all caches: (cache_name, total_entries, expired_entries)
+    ///
+    /// # Returns
+    /// A vector of tuples containing cache statistics
+    pub async fn get_cache_stats(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            ("user", self.user_cache.stats().await.0, self.user_cache.stats().await.1),
+            ("channel", self.channel_cache.stats().await.0, self.channel_cache.stats().await.1),
+            ("team", self.team_cache.stats().await.0, self.team_cache.stats().await.1),
+        ]
     }
 }
 
