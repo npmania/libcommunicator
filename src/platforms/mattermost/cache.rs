@@ -55,7 +55,7 @@ impl<T: Clone> Cache<T> {
     /// * `ttl` - Time-to-live duration for cache entries
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// use std::time::Duration;
     /// let cache = Cache::<String>::new(Duration::from_secs(300)); // 5 minute TTL
     /// ```

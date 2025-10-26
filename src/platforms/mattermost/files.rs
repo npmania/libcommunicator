@@ -25,8 +25,9 @@ impl MattermostClient {
     ///
     /// # Example
     /// ```no_run
+    /// # use communicator::platforms::mattermost::MattermostClient;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = mattermost::MattermostClient::new("https://example.com")?;
+    /// # let client = MattermostClient::new("https://example.com")?;
     /// use std::path::Path;
     /// let file_info = client.upload_file("channel_id", Path::new("document.pdf"), None).await?;
     /// # Ok(())
@@ -126,8 +127,9 @@ impl MattermostClient {
     ///
     /// # Example
     /// ```no_run
+    /// # use communicator::platforms::mattermost::MattermostClient;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = mattermost::MattermostClient::new("https://example.com")?;
+    /// # let client = MattermostClient::new("https://example.com")?;
     /// let file_bytes = client.download_file("file_id").await?;
     /// tokio::fs::write("downloaded.pdf", &file_bytes).await?;
     /// # Ok(())
@@ -167,8 +169,9 @@ impl MattermostClient {
     ///
     /// # Example
     /// ```no_run
+    /// # use communicator::platforms::mattermost::MattermostClient;
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let client = mattermost::MattermostClient::new("https://example.com")?;
+    /// # let client = MattermostClient::new("https://example.com")?;
     /// let file_info = client.get_file_info("file_id").await?;
     /// println!("File size: {} bytes", file_info.size);
     /// # Ok(())
