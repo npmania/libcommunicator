@@ -473,6 +473,45 @@ pub trait Platform: Send + Sync {
         Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
     }
 
+    /// Pin a message/post to its channel
+    ///
+    /// # Arguments
+    /// * `message_id` - The ID of the message to pin
+    ///
+    /// # Notes
+    /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
+    async fn pin_post(&self, message_id: &str) -> Result<()> {
+        let _ = message_id;
+        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+    }
+
+    /// Unpin a message/post from its channel
+    ///
+    /// # Arguments
+    /// * `message_id` - The ID of the message to unpin
+    ///
+    /// # Notes
+    /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
+    async fn unpin_post(&self, message_id: &str) -> Result<()> {
+        let _ = message_id;
+        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+    }
+
+    /// Get all pinned messages/posts for a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel
+    ///
+    /// # Returns
+    /// A vector of pinned messages, ordered by pin time
+    ///
+    /// # Notes
+    /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
+    async fn get_pinned_posts(&self, channel_id: &str) -> Result<Vec<Message>> {
+        let _ = channel_id;
+        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+    }
+
     /// Get a list of custom emojis available on the platform
     ///
     /// # Arguments

@@ -2480,6 +2480,147 @@ pub unsafe extern "C" fn communicator_platform_remove_reaction(
     }
 }
 
+/// Pin a message/post to its channel
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_pin_post(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let message_id_str = {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.pin_post(message_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// Unpin a message/post from its channel
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_unpin_post(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let message_id_str = {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.unpin_post(message_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// Get all pinned messages/posts for a channel
+///
+/// Returns a JSON string containing an array of pinned messages.
+/// The returned string must be freed using `communicator_free_string()`.
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_pinned_posts(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_pinned_posts(channel_id_str)) {
+        Ok(messages) => {
+            match serde_json::to_string(&messages) {
+                Ok(json) => {
+                    match std::ffi::CString::new(json) {
+                        Ok(c_string) => c_string.into_raw(),
+                        Err(_) => {
+                            error::set_last_error(Error::new(
+                                ErrorCode::Unknown,
+                                "Failed to convert JSON to C string".to_string(),
+                            ));
+                            std::ptr::null_mut()
+                        }
+                    }
+                }
+                Err(e) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        format!("Failed to serialize pinned posts: {e}"),
+                    ));
+                    std::ptr::null_mut()
+                }
+            }
+        }
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// FFI function: Get a list of custom emojis
 /// Returns a JSON string representing a Vec<Emoji>
 /// The caller must free the returned string using communicator_free_string()

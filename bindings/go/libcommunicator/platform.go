@@ -602,6 +602,63 @@ func (p *Platform) RemoveReaction(messageID, emojiName string) error {
 	return nil
 }
 
+// PinPost pins a message/post to its channel
+func (p *Platform) PinPost(messageID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csMessageID, freeMessageID := cStringFree(messageID)
+	defer freeMessageID()
+
+	result := C.communicator_platform_pin_post(p.handle, csMessageID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// UnpinPost unpins a message/post from its channel
+func (p *Platform) UnpinPost(messageID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csMessageID, freeMessageID := cStringFree(messageID)
+	defer freeMessageID()
+
+	result := C.communicator_platform_unpin_post(p.handle, csMessageID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetPinnedPosts gets all pinned messages/posts for a channel
+func (p *Platform) GetPinnedPosts(channelID string) ([]Message, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	cstr := C.communicator_platform_get_pinned_posts(p.handle, csChannelID)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var messages []Message
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &messages); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
 // GetEmojis retrieves a list of custom emojis from the platform
 func (p *Platform) GetEmojis(page, perPage uint32) ([]Emoji, error) {
 	if p.handle == nil {
