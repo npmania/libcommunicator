@@ -4208,6 +4208,242 @@ pub unsafe extern "C" fn communicator_platform_search_messages(
 }
 
 // ============================================================================
+// User Preferences and Notifications
+// ============================================================================
+
+/// FFI function: Get user preferences as JSON
+/// Returns a JSON string representing the user's preferences
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_user_preferences(
+    handle: PlatformHandle,
+    user_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let user_id_str = {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_user_preferences(user_id_str)) {
+        Ok(json) => match CString::new(json) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::OutOfMemory,
+                    "Failed to allocate string",
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Set user preferences from JSON
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_set_user_preferences(
+    handle: PlatformHandle,
+    user_id: *const c_char,
+    preferences_json: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() || preferences_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let user_id_str = {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let preferences_json_str = {
+        match std::ffi::CStr::from_ptr(preferences_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.set_user_preferences(user_id_str, preferences_json_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Mute a channel
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_mute_channel(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.mute_channel(channel_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Unmute a channel
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_unmute_channel(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.unmute_channel(channel_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Update channel notification properties from JSON
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_update_channel_notify_props(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    notify_props_json: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() || notify_props_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let notify_props_json_str = {
+        match std::ffi::CStr::from_ptr(notify_props_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.update_channel_notify_props(channel_id_str, notify_props_json_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 

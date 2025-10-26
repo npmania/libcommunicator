@@ -13,6 +13,7 @@ mod files;
 mod pinned;
 mod platform_impl;
 mod posts;
+mod preferences;
 mod reactions;
 mod search;
 mod status;

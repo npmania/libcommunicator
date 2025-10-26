@@ -971,6 +971,91 @@ pub trait Platform: Send + Sync {
         let _ = (query, limit);
         Err(crate::error::Error::unsupported("Channel autocomplete not supported by this platform"))
     }
+
+    // ========================================================================
+    // User Preferences and Notifications
+    // ========================================================================
+
+    /// Get user preferences as a JSON string
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    ///
+    /// # Returns
+    /// JSON string containing user preferences
+    ///
+    /// # Notes
+    /// The structure of preferences varies by platform.
+    /// Returns a platform-specific JSON representation.
+    async fn get_user_preferences(&self, user_id: &str) -> Result<String> {
+        let _ = user_id;
+        Err(crate::error::Error::unsupported("User preferences not supported by this platform"))
+    }
+
+    /// Set user preferences from a JSON string
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    /// * `preferences_json` - JSON string containing preferences to set
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// The structure of preferences varies by platform.
+    /// Accepts a platform-specific JSON representation.
+    async fn set_user_preferences(&self, user_id: &str, preferences_json: &str) -> Result<()> {
+        let _ = (user_id, preferences_json);
+        Err(crate::error::Error::unsupported("User preferences not supported by this platform"))
+    }
+
+    /// Mute a channel for the current user
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID to mute
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Muting a channel typically disables notifications for that channel.
+    /// The exact behavior may vary by platform.
+    async fn mute_channel(&self, channel_id: &str) -> Result<()> {
+        let _ = channel_id;
+        Err(crate::error::Error::unsupported("Channel muting not supported by this platform"))
+    }
+
+    /// Unmute a channel for the current user
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID to unmute
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Unmuting a channel typically restores default notification settings.
+    async fn unmute_channel(&self, channel_id: &str) -> Result<()> {
+        let _ = channel_id;
+        Err(crate::error::Error::unsupported("Channel muting not supported by this platform"))
+    }
+
+    /// Update channel notification properties from a JSON string
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `notify_props_json` - JSON string containing notification properties
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// The structure of notification properties varies by platform.
+    /// Accepts a platform-specific JSON representation.
+    async fn update_channel_notify_props(&self, channel_id: &str, notify_props_json: &str) -> Result<()> {
+        let _ = (channel_id, notify_props_json);
+        Err(crate::error::Error::unsupported("Channel notification settings not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

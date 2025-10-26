@@ -500,6 +500,157 @@ impl From<MattermostEmoji> for crate::types::Emoji {
     }
 }
 
+// ============================================================================
+// User Preferences and Notifications
+// ============================================================================
+
+/// Notification level for channels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NotificationLevel {
+    /// Notify for all messages
+    All,
+    /// Notify only for mentions
+    Mention,
+    /// No notifications
+    None,
+}
+
+impl NotificationLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            NotificationLevel::All => "all",
+            NotificationLevel::Mention => "mention",
+            NotificationLevel::None => "none",
+        }
+    }
+}
+
+/// User preference object
+/// Represents a single preference setting for a user
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserPreference {
+    /// User ID this preference belongs to
+    pub user_id: String,
+    /// Preference category (e.g., "display_settings", "notifications", "advanced_settings")
+    pub category: String,
+    /// Preference name within the category
+    pub name: String,
+    /// Preference value as a string
+    pub value: String,
+}
+
+impl UserPreference {
+    /// Create a new user preference
+    pub fn new(user_id: String, category: String, name: String, value: String) -> Self {
+        Self {
+            user_id,
+            category,
+            name,
+            value,
+        }
+    }
+}
+
+/// Channel notification properties
+/// Controls notification behavior for a specific channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelNotifyProps {
+    /// Desktop notification level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desktop: Option<String>,
+    /// Mobile push notification level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub push: Option<String>,
+    /// Email notification setting
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    /// Mark channel as unread
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mark_unread: Option<String>,
+    /// Ignore channel mentions (mute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_channel_mentions: Option<String>,
+}
+
+impl ChannelNotifyProps {
+    /// Create new channel notification properties with all values set to None
+    pub fn new() -> Self {
+        Self {
+            desktop: None,
+            push: None,
+            email: None,
+            mark_unread: None,
+            ignore_channel_mentions: None,
+        }
+    }
+
+    /// Create a muted channel configuration
+    pub fn muted() -> Self {
+        Self {
+            desktop: Some("none".to_string()),
+            push: Some("none".to_string()),
+            email: Some("false".to_string()),
+            mark_unread: Some("mention".to_string()),
+            ignore_channel_mentions: Some("on".to_string()),
+        }
+    }
+
+    /// Create an unmuted channel configuration (default notifications)
+    pub fn unmuted() -> Self {
+        Self {
+            desktop: Some("default".to_string()),
+            push: Some("default".to_string()),
+            email: Some("default".to_string()),
+            mark_unread: Some("all".to_string()),
+            ignore_channel_mentions: Some("off".to_string()),
+        }
+    }
+
+    /// Set desktop notification level
+    pub fn with_desktop(mut self, level: NotificationLevel) -> Self {
+        self.desktop = Some(level.as_str().to_string());
+        self
+    }
+
+    /// Set push notification level
+    pub fn with_push(mut self, level: NotificationLevel) -> Self {
+        self.push = Some(level.as_str().to_string());
+        self
+    }
+
+    /// Set email notification
+    pub fn with_email(mut self, enabled: bool) -> Self {
+        self.email = Some(if enabled { "true" } else { "false" }.to_string());
+        self
+    }
+
+    /// Set mark unread behavior
+    pub fn with_mark_unread(mut self, level: NotificationLevel) -> Self {
+        self.mark_unread = Some(level.as_str().to_string());
+        self
+    }
+}
+
+impl Default for ChannelNotifyProps {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request to update channel member notify properties
+#[derive(Debug, Clone, Serialize)]
+pub struct UpdateChannelNotifyPropsRequest {
+    #[serde(flatten)]
+    pub notify_props: ChannelNotifyProps,
+}
+
+/// Request to delete user preferences
+#[derive(Debug, Clone, Serialize)]
+pub struct DeletePreferencesRequest {
+    pub preferences: Vec<UserPreference>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

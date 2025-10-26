@@ -1102,6 +1102,83 @@ CommunicatorErrorCode communicator_platform_mark_thread_unread(
 );
 
 // ============================================================================
+// User Preferences and Notifications
+// ============================================================================
+
+/**
+ * Get user preferences as JSON
+ *
+ * Returns a JSON string representing the user's preferences.
+ * The caller must free the returned string using communicator_free_string().
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @return JSON string (caller must free) or NULL on error
+ */
+char* communicator_platform_get_user_preferences(
+    CommunicatorPlatform platform,
+    const char* user_id
+);
+
+/**
+ * Set user preferences from JSON
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @param preferences_json JSON string containing preferences to set
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_set_user_preferences(
+    CommunicatorPlatform platform,
+    const char* user_id,
+    const char* preferences_json
+);
+
+/**
+ * Mute a channel
+ *
+ * Mutes a channel for the current user, disabling notifications.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to mute
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_mute_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Unmute a channel
+ *
+ * Unmutes a channel for the current user, restoring default notification settings.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to unmute
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_unmute_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Update channel notification properties
+ *
+ * Updates channel notification properties from a JSON string.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param notify_props_json JSON string containing notification properties
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_update_channel_notify_props(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* notify_props_json
+);
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 
