@@ -107,8 +107,8 @@ mod tests {
         });
         assert_eq!(result, 42);
 
-        // Shutdown runtime
-        shutdown_runtime();
+        // Note: Don't shutdown runtime in tests - it's shared globally
+        // and other tests may be using it concurrently
     }
 
     #[test]
@@ -125,7 +125,8 @@ mod tests {
         let result = block_on(async { handle.unwrap().await.unwrap() });
         assert_eq!(result, "done");
 
-        shutdown_runtime();
+        // Note: Don't shutdown runtime in tests - it's shared globally
+        // and other tests may be using it concurrently
     }
 
     #[test]
@@ -134,6 +135,7 @@ mod tests {
         init_runtime().expect("Failed to initialize runtime");
         init_runtime().expect("Second init should be a no-op");
 
-        shutdown_runtime();
+        // Note: Don't shutdown runtime in tests - it's shared globally
+        // and other tests may be using it concurrently
     }
 }
