@@ -341,15 +341,12 @@ impl WebSocketManager {
                     msg = read.next() => {
                         match msg {
                             Some(Ok(Message::Text(text))) => {
-                                if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
-                                    eprintln!("Error handling WebSocket message: {e}");
-                                }
+                                let _ = Self::handle_message(text, &event_tx, &last_received_seq).await;
                             }
                             Some(Ok(Message::Ping(data))) => {
                                 // Respond to ping with pong
                                 if let Some(writer) = ws_writer.lock().await.as_mut() {
-                                    if let Err(e) = writer.send(Message::Pong(data)).await {
-                                        eprintln!("Failed to send pong: {e}");
+                                    if writer.send(Message::Pong(data)).await.is_err() {
                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                         *ws_writer.lock().await = None;
                                         break;
@@ -360,19 +357,16 @@ impl WebSocketManager {
                                 // Pong received - connection is alive
                             }
                             Some(Ok(Message::Close(_))) => {
-                                println!("WebSocket closed by server");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
                             }
-                            Some(Err(e)) => {
-                                eprintln!("WebSocket error: {e}");
+                            Some(Err(_)) => {
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
                             }
                             None => {
-                                println!("WebSocket stream ended");
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
@@ -383,8 +377,7 @@ impl WebSocketManager {
                     // Send periodic ping to keep connection alive
                     _ = ping_timer.tick() => {
                         if let Some(writer) = ws_writer.lock().await.as_mut() {
-                            if let Err(e) = writer.send(Message::Ping(vec![])).await {
-                                eprintln!("Failed to send ping: {e}");
+                            if writer.send(Message::Ping(vec![])).await.is_err() {
                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                 *ws_writer.lock().await = None;
                                 break;
@@ -393,7 +386,6 @@ impl WebSocketManager {
                     }
                     // Handle shutdown signal
                     _ = current_shutdown_rx.recv() => {
-                        println!("WebSocket shutdown requested");
                         *connection_state.lock().await = ConnectionState::ShuttingDown;
                         *ws_writer.lock().await = None;
                         break;
@@ -417,7 +409,6 @@ impl WebSocketManager {
                     // Check if we've exceeded max attempts
                     if let Some(max_attempts) = config.max_reconnect_attempts {
                         if attempt_num >= max_attempts {
-                            eprintln!("Max reconnection attempts ({max_attempts}) reached, giving up");
                             *connection_state.lock().await = ConnectionState::Disconnected;
                             break;
                         }
@@ -438,14 +429,11 @@ impl WebSocketManager {
                     // But we should refactor calculate_backoff_delay to be a static method
                     let delay = Self::calculate_backoff_delay_static(&config, attempt_num);
 
-                    println!("WebSocket disconnected. Attempting reconnection {} in {} ms...", attempt_num + 1, delay);
                     tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
 
                     // Attempt to reconnect
                     match connect_async(&ws_url).await {
                         Ok((ws_stream, _)) => {
-                            println!("WebSocket reconnected successfully");
-
                             let (mut write, new_read) = ws_stream.split();
 
                             // Send authentication challenge
@@ -482,14 +470,11 @@ impl WebSocketManager {
                                             msg = read.next() => {
                                                 match msg {
                                                     Some(Ok(Message::Text(text))) => {
-                                                        if let Err(e) = Self::handle_message(text, &event_tx, &last_received_seq).await {
-                                                            eprintln!("Error handling WebSocket message: {e}");
-                                                        }
+                                                        let _ = Self::handle_message(text, &event_tx, &last_received_seq).await;
                                                     }
                                                     Some(Ok(Message::Ping(data))) => {
                                                         if let Some(writer) = ws_writer.lock().await.as_mut() {
-                                                            if let Err(e) = writer.send(Message::Pong(data)).await {
-                                                                eprintln!("Failed to send pong: {e}");
+                                                            if writer.send(Message::Pong(data)).await.is_err() {
                                                                 *connection_state.lock().await = ConnectionState::Disconnected;
                                                                 *ws_writer.lock().await = None;
                                                                 break 'message_loop;
@@ -498,19 +483,16 @@ impl WebSocketManager {
                                                     }
                                                     Some(Ok(Message::Pong(_))) => {}
                                                     Some(Ok(Message::Close(_))) => {
-                                                        println!("WebSocket closed by server");
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
                                                     }
-                                                    Some(Err(e)) => {
-                                                        eprintln!("WebSocket error: {e}");
+                                                    Some(Err(_)) => {
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
                                                     }
                                                     None => {
-                                                        println!("WebSocket stream ended");
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
@@ -520,8 +502,7 @@ impl WebSocketManager {
                                             }
                                             _ = ping_timer.tick() => {
                                                 if let Some(writer) = ws_writer.lock().await.as_mut() {
-                                                    if let Err(e) = writer.send(Message::Ping(vec![])).await {
-                                                        eprintln!("Failed to send ping: {e}");
+                                                    if writer.send(Message::Ping(vec![])).await.is_err() {
                                                         *connection_state.lock().await = ConnectionState::Disconnected;
                                                         *ws_writer.lock().await = None;
                                                         break 'message_loop;
@@ -529,7 +510,6 @@ impl WebSocketManager {
                                                 }
                                             }
                                             _ = current_shutdown_rx.recv() => {
-                                                println!("WebSocket shutdown requested");
                                                 *connection_state.lock().await = ConnectionState::ShuttingDown;
                                                 *ws_writer.lock().await = None;
                                                 return; // Exit completely
@@ -537,15 +517,10 @@ impl WebSocketManager {
                                         }
                                     }
                                     // If we break from the inner loop, continue the reconnection loop
-                                } else {
-                                    eprintln!("Failed to authenticate after reconnection");
                                 }
-                            } else {
-                                eprintln!("Failed to serialize auth message");
                             }
                         }
-                        Err(e) => {
-                            eprintln!("Reconnection attempt {} failed: {}", attempt_num + 1, e);
+                        Err(_) => {
                             // Continue to next reconnection attempt
                         }
                     }
@@ -573,7 +548,6 @@ impl WebSocketManager {
                 // Authentication successful - this is informational, not emitted as an event
                 return Ok(());
             } else {
-                eprintln!("Authentication failed: status = {}", auth_response.status);
                 return Err(Error::new(
                     ErrorCode::AuthenticationFailed,
                     format!("Authentication failed with status: {}", auth_response.status)
@@ -584,40 +558,20 @@ impl WebSocketManager {
         // Parse as a standard WebSocket event
         let ws_event: WebSocketEvent = serde_json::from_str(&text)
             .map_err(|e| {
-                // Log raw message snippet for debugging (first 200 chars)
-                let snippet = &text[..text.len().min(200)];
-                eprintln!("Failed to parse WebSocket event: {e} | Raw: {snippet}");
                 Error::new(ErrorCode::Unknown, format!("Failed to parse WebSocket event: {e}"))
             })?;
 
         // Check for sequence gaps
         if ws_event.seq > 0 {
             let mut last_seq = last_received_seq.lock().await;
-            let expected_seq = *last_seq + 1;
-            if *last_seq > 0 && ws_event.seq > expected_seq {
-                eprintln!(
-                    "WARNING: WebSocket sequence gap detected! Expected {}, got {}. {} events may have been missed.",
-                    expected_seq,
-                    ws_event.seq,
-                    ws_event.seq - expected_seq
-                );
-            }
             *last_seq = ws_event.seq;
         }
 
         // Convert WebSocket event to PlatformEvent
         if let Some(platform_event) = Self::convert_event(ws_event) {
             // Try to send event to channel
-            // If full, log warning and drop the event (non-blocking)
-            match event_tx.try_send(platform_event) {
-                Ok(_) => {} // Event sent successfully
-                Err(mpsc::error::TrySendError::Full(event)) => {
-                    eprintln!("WARNING: Event queue is full, dropping event: {event:?}");
-                }
-                Err(mpsc::error::TrySendError::Closed(_)) => {
-                    // Receiver dropped, silently ignore
-                }
-            }
+            // If full, drop the event silently (non-blocking)
+            let _ = event_tx.try_send(platform_event);
         }
 
         Ok(())
@@ -635,14 +589,9 @@ impl WebSocketManager {
                         if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             let message = post.into();
                             return Some(PlatformEvent::MessagePosted(message));
-                        } else {
-                            eprintln!("Failed to deserialize post JSON: {post_str}");
                         }
-                    } else {
-                        eprintln!("Post data is not a string: {post_data:?}");
                     }
                 }
-                eprintln!("Failed to parse 'posted' event data");
                 None
             }
             "post_edited" => {
@@ -654,14 +603,9 @@ impl WebSocketManager {
                         if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             let message = post.into();
                             return Some(PlatformEvent::MessageUpdated(message));
-                        } else {
-                            eprintln!("Failed to deserialize post JSON: {post_str}");
                         }
-                    } else {
-                        eprintln!("Post data is not a string: {post_data:?}");
                     }
                 }
-                eprintln!("Failed to parse 'post_edited' event data");
                 None
             }
             "post_deleted" => {
@@ -673,11 +617,9 @@ impl WebSocketManager {
                         if let Ok(post) = serde_json::from_str::<MattermostPost>(post_str) {
                             post.id
                         } else {
-                            eprintln!("Failed to deserialize post JSON for deletion: {post_str}");
                             String::new()
                         }
                     } else {
-                        eprintln!("Post data is not a string: {post_data:?}");
                         String::new()
                     }
                 } else {
@@ -720,11 +662,6 @@ impl WebSocketManager {
                         }
                     }
                 }
-                // Fallback: if we can't parse the full channel, at least notify about the channel ID
-                if !ws_event.broadcast.channel_id.is_empty() {
-                    eprintln!("Failed to parse 'channel_created' event data, but channel ID available: {}",
-                              ws_event.broadcast.channel_id);
-                }
                 None
             }
             "channel_deleted" => {
@@ -742,7 +679,6 @@ impl WebSocketManager {
                         }
                     }
                 }
-                eprintln!("Failed to parse 'channel_updated' event data");
                 None
             }
             "status_change" => {
@@ -793,7 +729,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse reaction_added event data");
                     None
                 }
             }
@@ -821,7 +756,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse reaction_removed event data");
                     None
                 }
             }
@@ -830,7 +764,6 @@ impl WebSocketManager {
                 if !channel_id.is_empty() {
                     Some(PlatformEvent::DirectChannelAdded { channel_id })
                 } else {
-                    eprintln!("Failed to parse direct_added event: missing channel_id");
                     None
                 }
             }
@@ -839,7 +772,6 @@ impl WebSocketManager {
                 if !channel_id.is_empty() {
                     Some(PlatformEvent::GroupChannelAdded { channel_id })
                 } else {
-                    eprintln!("Failed to parse group_added event: missing channel_id");
                     None
                 }
             }
@@ -866,8 +798,6 @@ impl WebSocketManager {
                     })
                 } else {
                     // For preferences_changed (plural), the data structure might be different
-                    // Log for debugging but don't emit event
-                    eprintln!("Failed to parse preference event data");
                     None
                 }
             }
@@ -885,7 +815,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse ephemeral_message event data");
                     None
                 }
             }
@@ -898,7 +827,6 @@ impl WebSocketManager {
                 if !user_id.is_empty() {
                     Some(PlatformEvent::UserAdded { user_id })
                 } else {
-                    eprintln!("Failed to parse new_user event data");
                     None
                 }
             }
@@ -918,7 +846,6 @@ impl WebSocketManager {
                 if !user_id.is_empty() {
                     Some(PlatformEvent::UserUpdated { user_id })
                 } else {
-                    eprintln!("Failed to parse user_updated event data");
                     None
                 }
             }
@@ -931,7 +858,6 @@ impl WebSocketManager {
                 if !user_id.is_empty() {
                     Some(PlatformEvent::UserRoleUpdated { user_id })
                 } else {
-                    eprintln!("Failed to parse user_role_updated event data");
                     None
                 }
             }
@@ -945,7 +871,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse channel_viewed event data");
                     None
                 }
             }
@@ -963,7 +888,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse thread_updated event data");
                     None
                 }
             }
@@ -983,7 +907,6 @@ impl WebSocketManager {
                         channel_id,
                     })
                 } else {
-                    eprintln!("Failed to parse thread_read_changed event data");
                     None
                 }
             }
@@ -1007,7 +930,6 @@ impl WebSocketManager {
                         following,
                     })
                 } else {
-                    eprintln!("Failed to parse thread_follow_changed event data");
                     None
                 }
             }
@@ -1029,7 +951,6 @@ impl WebSocketManager {
                         user_id,
                     })
                 } else {
-                    eprintln!("Failed to parse post_unread event data");
                     None
                 }
             }
@@ -1049,7 +970,6 @@ impl WebSocketManager {
                         emoji_name,
                     })
                 } else {
-                    eprintln!("Failed to parse emoji_added event data");
                     None
                 }
             }
@@ -1069,7 +989,6 @@ impl WebSocketManager {
                         user_id,
                     })
                 } else {
-                    eprintln!("Failed to parse added_to_team event data");
                     None
                 }
             }
@@ -1089,7 +1008,6 @@ impl WebSocketManager {
                         user_id,
                     })
                 } else {
-                    eprintln!("Failed to parse leave_team event data");
                     None
                 }
             }
@@ -1106,7 +1024,6 @@ impl WebSocketManager {
                 if !channel_id.is_empty() {
                     Some(PlatformEvent::ChannelConverted { channel_id })
                 } else {
-                    eprintln!("Failed to parse channel_converted event: missing channel_id");
                     None
                 }
             }
@@ -1123,7 +1040,6 @@ impl WebSocketManager {
                         user_id,
                     })
                 } else {
-                    eprintln!("Failed to parse channel_member_updated event data");
                     None
                 }
             }
@@ -1136,7 +1052,6 @@ impl WebSocketManager {
                 if !team_id.is_empty() {
                     Some(PlatformEvent::TeamDeleted { team_id })
                 } else {
-                    eprintln!("Failed to parse delete_team event data");
                     None
                 }
             }
@@ -1150,7 +1065,6 @@ impl WebSocketManager {
                 if !team_id.is_empty() {
                     Some(PlatformEvent::TeamUpdated { team_id })
                 } else {
-                    eprintln!("Failed to parse update_team event data");
                     None
                 }
             }
@@ -1167,7 +1081,6 @@ impl WebSocketManager {
                         user_id,
                     })
                 } else {
-                    eprintln!("Failed to parse memberrole_updated event data");
                     None
                 }
             }
@@ -1181,7 +1094,6 @@ impl WebSocketManager {
                 if !plugin_id.is_empty() {
                     Some(PlatformEvent::PluginDisabled { plugin_id })
                 } else {
-                    eprintln!("Failed to parse plugin_disabled event data");
                     None
                 }
             }
@@ -1195,7 +1107,6 @@ impl WebSocketManager {
                 if !plugin_id.is_empty() {
                     Some(PlatformEvent::PluginEnabled { plugin_id })
                 } else {
-                    eprintln!("Failed to parse plugin_enabled event data");
                     None
                 }
             }
@@ -1218,7 +1129,6 @@ impl WebSocketManager {
                         name,
                     })
                 } else {
-                    eprintln!("Failed to parse preferences_deleted event data");
                     None
                 }
             }
@@ -1251,7 +1161,6 @@ impl WebSocketManager {
                 if !dialog_id.is_empty() {
                     Some(PlatformEvent::DialogOpened { dialog_id })
                 } else {
-                    eprintln!("Failed to parse dialog_opened event data");
                     None
                 }
             }
@@ -1265,7 +1174,6 @@ impl WebSocketManager {
                 if !role_id.is_empty() {
                     Some(PlatformEvent::RoleUpdated { role_id })
                 } else {
-                    eprintln!("Failed to parse role_updated event data");
                     None
                 }
             }
@@ -1275,8 +1183,7 @@ impl WebSocketManager {
                 None
             }
             _ => {
-                // Unknown event type - log for visibility
-                println!("Unknown/unhandled WebSocket event: {}", ws_event.event);
+                // Unknown event type - silently ignore
                 None
             }
         }

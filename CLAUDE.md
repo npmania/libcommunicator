@@ -151,6 +151,60 @@ Key Rust crates:
 - All FFI functions should be marked `#[no_mangle]` and `extern "C"`
 - Document all public FFI functions thoroughly
 
+### Logging and Output Policy
+
+**CRITICAL: This is a dynamic library - NEVER write to stdout/stderr in production code**
+
+As a dynamic library, libcommunicator must operate **silently**. Any logging or output interferes with the consuming application's behavior and violates library design principles.
+
+**Strict Rules**:
+- ❌ **NEVER** use `println!` or `eprintln!` in any code
+- ❌ **NEVER** use `print!` or `eprint!` macros
+- ❌ **NEVER** use `dbg!` macro outside of `#[cfg(test)]`
+- ❌ **NEVER** write directly to stdout/stderr
+- ❌ **NEVER** use logging frameworks (log, tracing) that output to console by default
+
+**Error Communication**:
+- ✅ Return errors via `Result<T, Error>` types
+- ✅ Use error codes and detailed error messages in `Error` structs
+- ✅ Provide error callbacks through FFI for async operations
+- ✅ Store diagnostic information in error types, not console output
+
+**Debugging During Development**:
+- Use `#[cfg(test)]` blocks for debug output in tests only
+- Use conditional compilation with custom feature flags for development logging
+- Use Rust's built-in debugging tools (rust-gdb, rust-lldb) instead of print debugging
+- Consider using trace/debug macros behind feature flags that are disabled by default
+
+**Examples**:
+```rust
+// ❌ BAD - Never do this in library code
+eprintln!("Error: Failed to connect: {}", e);
+println!("WebSocket connected successfully");
+
+// ✅ GOOD - Return errors through Result types
+Err(Error::new(ErrorCode::NetworkError, format!("Failed to connect: {e}")))
+
+// ✅ GOOD - Silent error handling
+if let Err(_) = some_operation() {
+    // Handle error silently, update internal state
+    *connection_state.lock().await = ConnectionState::Disconnected;
+}
+
+// ✅ GOOD - Debug output only in tests
+#[cfg(test)]
+{
+    eprintln!("Test debug: connection state = {:?}", state);
+}
+```
+
+**Why This Matters**:
+- Library output interferes with application's stdout/stderr
+- Breaks applications that parse stdout (CLI tools, scripts)
+- Cannot be disabled or redirected by consuming applications
+- Violates the principle of least surprise
+- Makes the library unsuitable for production use
+
 ### Working with Mattermost API Specification
 - The `api-spec.yaml` file in `src/platforms/mattermost/` is the authoritative source for API endpoints
 - Use the spec to:

@@ -146,11 +146,8 @@ impl MattermostClient {
             self.set_team_id(None).await;
             self.set_state(ConnectionState::Disconnected).await;
 
-            // Check if the logout call was successful
-            if let Err(e) = response {
-                // Log the error but don't fail - we've already cleared local state
-                eprintln!("Logout API call failed (local state cleared): {e}");
-            }
+            // Silently ignore logout API errors - we've already cleared local state
+            let _ = response;
         } else {
             self.set_state(ConnectionState::Disconnected).await;
         }

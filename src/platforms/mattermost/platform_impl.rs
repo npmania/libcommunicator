@@ -76,9 +76,7 @@ impl MattermostPlatform {
                             };
                             channel.display_name = display_name;
                         }
-                        Err(e) => {
-                            // Log error but don't fail the whole operation
-                            eprintln!("Failed to fetch DM partner user {partner_id}: {e}");
+                        Err(_) => {
                             // Fall back to a generic name
                             channel.display_name = "Direct Message".to_string();
                         }
@@ -217,12 +215,9 @@ impl Platform for MattermostPlatform {
         // Fetch user details for each member
         let mut users = Vec::new();
         for member in mm_members {
-            match self.client.get_user(&member.user_id).await {
-                Ok(mm_user) => users.push(mm_user.into()),
-                Err(e) => {
-                    eprintln!("Failed to fetch user {}: {}", member.user_id, e);
-                    // Continue with other users even if one fails
-                }
+            if let Ok(mm_user) = self.client.get_user(&member.user_id).await {
+                users.push(mm_user.into());
+                // Continue with other users even if one fails
             }
         }
 
@@ -262,10 +257,7 @@ impl Platform for MattermostPlatform {
         // TODO: Mattermost supports custom status messages via a separate API endpoint
         // For now, we're ignoring the custom_message parameter
         // Future enhancement: call the custom status API if custom_message is provided
-        if custom_message.is_some() {
-            // Log that this feature is not yet implemented
-            eprintln!("Warning: Custom status messages are not yet implemented for Mattermost");
-        }
+        let _ = custom_message;
 
         Ok(())
     }
