@@ -557,6 +557,38 @@ char* communicator_platform_get_messages_after(
 );
 
 // ============================================================================
+// Reaction Operations
+// ============================================================================
+
+/**
+ * Add a reaction to a message
+ *
+ * @param platform The platform handle
+ * @param message_id The message ID to react to
+ * @param emoji_name The emoji name (e.g., "thumbsup", "smile", "heart")
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_add_reaction(
+    CommunicatorPlatform platform,
+    const char* message_id,
+    const char* emoji_name
+);
+
+/**
+ * Remove a reaction from a message
+ *
+ * @param platform The platform handle
+ * @param message_id The message ID
+ * @param emoji_name The emoji name to remove
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_remove_reaction(
+    CommunicatorPlatform platform,
+    const char* message_id,
+    const char* emoji_name
+);
+
+// ============================================================================
 // Extended Channel Operations
 // ============================================================================
 

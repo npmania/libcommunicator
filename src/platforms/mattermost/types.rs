@@ -173,6 +173,23 @@ pub struct FileInfo {
     pub has_preview_image: bool,
 }
 
+/// Mattermost Reaction object from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reaction {
+    pub user_id: String,
+    pub post_id: String,
+    pub emoji_name: String,
+    pub create_at: i64,
+}
+
+/// Request to save a reaction
+#[derive(Debug, Clone, Serialize)]
+pub struct SaveReactionRequest {
+    pub user_id: String,
+    pub post_id: String,
+    pub emoji_name: String,
+}
+
 /// Mattermost Team (workspace) object from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MattermostTeam {

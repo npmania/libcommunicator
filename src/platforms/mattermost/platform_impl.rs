@@ -404,6 +404,15 @@ impl Platform for MattermostPlatform {
         Ok(messages)
     }
 
+    async fn add_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
+        self.client.add_reaction(message_id, emoji).await?;
+        Ok(())
+    }
+
+    async fn remove_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
+        self.client.remove_reaction(message_id, emoji).await
+    }
+
     async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
         let mm_channel = self.client.get_channel_by_name(team_id, channel_name).await?;
         let current_user_id = self.client.get_user_id().await;

@@ -83,6 +83,14 @@ type Message struct {
 	Metadata    interface{}  `json:"metadata,omitempty"` // Added to match Rust
 }
 
+// Reaction represents an emoji reaction to a message
+type Reaction struct {
+	UserID    string    `json:"user_id"`
+	PostID    string    `json:"post_id"`
+	EmojiName string    `json:"emoji_name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ConnectionInfo represents connection information
 type ConnectionInfo struct {
 	State     ConnectionState `json:"state"`
@@ -102,6 +110,7 @@ type Event struct {
 	UserID    string `json:"user_id,omitempty"`
 	Status    string `json:"status,omitempty"`
 	State     string `json:"state,omitempty"`
+	EmojiName string `json:"emoji_name,omitempty"`
 }
 
 // EventType constants
@@ -117,6 +126,8 @@ const (
 	EventUserJoinedChannel     = "user_joined_channel"
 	EventUserLeftChannel       = "user_left_channel"
 	EventConnectionStateChange = "connection_state_changed"
+	EventReactionAdded         = "reaction_added"
+	EventReactionRemoved       = "reaction_removed"
 )
 
 // PlatformConfig holds configuration for connecting to a platform

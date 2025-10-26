@@ -447,6 +447,32 @@ pub trait Platform: Send + Sync {
         Err(crate::error::Error::unsupported("Message pagination not supported by this platform"))
     }
 
+    /// Add a reaction to a message
+    ///
+    /// # Arguments
+    /// * `message_id` - The message ID to react to
+    /// * `emoji` - The emoji name (e.g., "thumbsup", "smile", "heart")
+    ///
+    /// # Notes
+    /// Not all platforms support reactions. Check `capabilities().supports_reactions` first.
+    async fn add_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
+        let _ = (message_id, emoji);
+        Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
+    }
+
+    /// Remove a reaction from a message
+    ///
+    /// # Arguments
+    /// * `message_id` - The message ID
+    /// * `emoji` - The emoji name to remove
+    ///
+    /// # Notes
+    /// Not all platforms support reactions. Check `capabilities().supports_reactions` first.
+    async fn remove_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
+        let _ = (message_id, emoji);
+        Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
+    }
+
     /// Get a channel by name
     ///
     /// # Arguments

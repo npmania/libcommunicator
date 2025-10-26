@@ -510,6 +510,46 @@ func (p *Platform) GetMessagesAfter(channelID, afterID string, limit uint32) ([]
 	return messages, nil
 }
 
+// AddReaction adds a reaction to a message
+func (p *Platform) AddReaction(messageID, emojiName string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csMessageID, freeMessageID := cStringFree(messageID)
+	defer freeMessageID()
+
+	csEmojiName, freeEmojiName := cStringFree(emojiName)
+	defer freeEmojiName()
+
+	result := C.communicator_platform_add_reaction(p.handle, csMessageID, csEmojiName)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// RemoveReaction removes a reaction from a message
+func (p *Platform) RemoveReaction(messageID, emojiName string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csMessageID, freeMessageID := cStringFree(messageID)
+	defer freeMessageID()
+
+	csEmojiName, freeEmojiName := cStringFree(emojiName)
+	defer freeEmojiName()
+
+	result := C.communicator_platform_remove_reaction(p.handle, csMessageID, csEmojiName)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
 // GetChannelByName gets a channel by name
 func (p *Platform) GetChannelByName(teamID, channelName string) (*Channel, error) {
 	if p.handle == nil {

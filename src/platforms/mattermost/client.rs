@@ -82,6 +82,16 @@ impl MattermostClient {
         self.user_id.read().await.clone()
     }
 
+    /// Get the current user ID, returning an error if not authenticated
+    pub async fn current_user_id(&self) -> Result<String> {
+        self.get_user_id().await.ok_or_else(|| {
+            Error::new(
+                ErrorCode::InvalidState,
+                "Not authenticated - no user ID available",
+            )
+        })
+    }
+
     /// Update the connection state
     pub async fn set_state(&self, state: ConnectionState) {
         let mut s = self.state.write().await;

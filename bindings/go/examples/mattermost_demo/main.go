@@ -148,7 +148,7 @@ func main() {
 	}
 
 	// ========================================================================
-	// Optional: Send a message (uncomment to test)
+	// Optional: Send a message and add reactions (uncomment to test)
 	// ========================================================================
 	/*
 	if len(channels) > 0 {
@@ -161,6 +161,28 @@ func main() {
 			msgJSON, _ := json.MarshalIndent(msg, "   ", "  ")
 			fmt.Printf("   Sent Message: %s\n", string(msgJSON))
 			fmt.Println("   ✓ Message sent\n")
+
+			// Add reactions to the message
+			fmt.Println("10. Adding reactions to the message...")
+			if err := platform.AddReaction(msg.ID, "thumbsup"); err != nil {
+				log.Printf("Failed to add thumbsup reaction: %v", err)
+			} else {
+				fmt.Println("   ✓ Added 👍 reaction")
+			}
+
+			if err := platform.AddReaction(msg.ID, "heart"); err != nil {
+				log.Printf("Failed to add heart reaction: %v", err)
+			} else {
+				fmt.Println("   ✓ Added ❤️ reaction")
+			}
+
+			// Remove a reaction
+			fmt.Println("\n11. Removing thumbsup reaction...")
+			if err := platform.RemoveReaction(msg.ID, "thumbsup"); err != nil {
+				log.Printf("Failed to remove thumbsup reaction: %v", err)
+			} else {
+				fmt.Println("   ✓ Removed 👍 reaction\n")
+			}
 		}
 	}
 	*/

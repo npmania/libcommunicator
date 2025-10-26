@@ -2289,6 +2289,108 @@ pub unsafe extern "C" fn communicator_platform_get_messages_after(
     }
 }
 
+/// FFI function: Add a reaction to a message
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_add_reaction(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+    emoji_name: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() || emoji_name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let message_id_str = {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let emoji_name_str = {
+        match std::ffi::CStr::from_ptr(emoji_name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.add_reaction(message_id_str, emoji_name_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Remove a reaction from a message
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_remove_reaction(
+    handle: PlatformHandle,
+    message_id: *const c_char,
+    emoji_name: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || message_id.is_null() || emoji_name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let message_id_str = {
+        match std::ffi::CStr::from_ptr(message_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let emoji_name_str = {
+        match std::ffi::CStr::from_ptr(emoji_name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.remove_reaction(message_id_str, emoji_name_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
 /// FFI function: Get a channel by name
 /// Returns a JSON string representing the Channel
 /// The caller must free the returned string using communicator_free_string()
