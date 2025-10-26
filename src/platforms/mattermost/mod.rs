@@ -8,6 +8,7 @@ mod auth;
 mod channels;
 mod client;
 mod convert;
+mod files;
 mod platform_impl;
 mod posts;
 mod reactions;

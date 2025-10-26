@@ -888,6 +888,79 @@ CommunicatorErrorCode communicator_platform_send_typing_indicator(
 );
 
 // ============================================================================
+// File Operations
+// ============================================================================
+
+/**
+ * Upload a file to a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID where the file will be uploaded
+ * @param file_path Path to the file to upload
+ * @return A dynamically allocated string containing the file ID (caller must free with communicator_free_string())
+ *         Returns NULL on error
+ */
+char* communicator_platform_upload_file(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* file_path
+);
+
+/**
+ * Download a file by its ID
+ *
+ * @param platform The platform handle
+ * @param file_id The ID of the file to download
+ * @param out_data Output parameter for the file data (caller must free with communicator_free_file_data())
+ * @param out_size Output parameter for the size of the file data in bytes
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_download_file(
+    CommunicatorPlatform platform,
+    const char* file_id,
+    uint8_t** out_data,
+    size_t* out_size
+);
+
+/**
+ * Get file metadata without downloading the file
+ *
+ * @param platform The platform handle
+ * @param file_id The ID of the file
+ * @return A dynamically allocated JSON string representing the Attachment metadata
+ *         (caller must free with communicator_free_string())
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_file_metadata(
+    CommunicatorPlatform platform,
+    const char* file_id
+);
+
+/**
+ * Get file thumbnail
+ *
+ * @param platform The platform handle
+ * @param file_id The ID of the file
+ * @param out_data Output parameter for the thumbnail data (caller must free with communicator_free_file_data())
+ * @param out_size Output parameter for the size of the thumbnail data in bytes
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_get_file_thumbnail(
+    CommunicatorPlatform platform,
+    const char* file_id,
+    uint8_t** out_data,
+    size_t* out_size
+);
+
+/**
+ * Free file data allocated by download_file or get_file_thumbnail
+ *
+ * @param data Pointer to file data
+ * @param size Size of the data in bytes
+ */
+void communicator_free_file_data(uint8_t* data, size_t size);
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 
