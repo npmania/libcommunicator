@@ -689,6 +689,100 @@ pub trait Platform: Send + Sync {
         let _ = team_id;
         Err(crate::error::Error::unsupported("Setting team ID not supported by this platform"))
     }
+
+    // ========================================================================
+    // Thread Operations
+    // ========================================================================
+
+    /// Get a thread (root post and all replies)
+    ///
+    /// Fetches a complete thread including the root post and all replies.
+    ///
+    /// # Arguments
+    /// * `post_id` - The ID of any post in the thread (typically the root post)
+    ///
+    /// # Returns
+    /// Vector of messages in the thread, typically ordered chronologically
+    ///
+    /// # Notes
+    /// Not all platforms support threading. Check `capabilities().has_threads` first.
+    /// The returned messages should include the root post plus all replies.
+    async fn get_thread(&self, post_id: &str) -> Result<Vec<Message>> {
+        let _ = post_id;
+        Err(crate::error::Error::unsupported("Thread operations not supported by this platform"))
+    }
+
+    /// Start following a thread
+    ///
+    /// Makes the authenticated user follow a thread to receive notifications for new replies.
+    ///
+    /// # Arguments
+    /// * `thread_id` - The thread ID (typically the root post ID)
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support thread following. This is a best-effort operation.
+    /// Some platforms may automatically follow threads when you participate in them.
+    async fn follow_thread(&self, thread_id: &str) -> Result<()> {
+        let _ = thread_id;
+        Err(crate::error::Error::unsupported("Thread following not supported by this platform"))
+    }
+
+    /// Stop following a thread
+    ///
+    /// Makes the authenticated user unfollow a thread to stop receiving notifications.
+    ///
+    /// # Arguments
+    /// * `thread_id` - The thread ID (typically the root post ID)
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support thread following.
+    async fn unfollow_thread(&self, thread_id: &str) -> Result<()> {
+        let _ = thread_id;
+        Err(crate::error::Error::unsupported("Thread following not supported by this platform"))
+    }
+
+    /// Mark a thread as read
+    ///
+    /// Marks all messages in a thread as read up to the current time.
+    ///
+    /// # Arguments
+    /// * `thread_id` - The thread ID (typically the root post ID)
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support read receipts or thread read status.
+    /// This method marks the thread as read up to the current timestamp.
+    async fn mark_thread_read(&self, thread_id: &str) -> Result<()> {
+        let _ = thread_id;
+        Err(crate::error::Error::unsupported("Thread read status not supported by this platform"))
+    }
+
+    /// Mark a thread as unread
+    ///
+    /// Marks a thread as unread, typically from a specific post onwards.
+    ///
+    /// # Arguments
+    /// * `thread_id` - The thread ID (typically the root post ID)
+    /// * `post_id` - The post ID to mark as unread from
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support marking threads as unread.
+    /// The behavior may vary - some platforms mark from the specified post, others mark the entire thread.
+    async fn mark_thread_unread(&self, thread_id: &str, post_id: &str) -> Result<()> {
+        let _ = (thread_id, post_id);
+        Err(crate::error::Error::unsupported("Thread read status not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

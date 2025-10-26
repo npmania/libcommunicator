@@ -433,6 +433,56 @@ pub struct MattermostErrorResponse {
     pub is_oauth: bool,
 }
 
+/// Mattermost Thread object representing a followed thread
+/// Based on API spec: UserThread schema
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserThread {
+    /// ID of the post that is this thread's root
+    pub id: String,
+    /// Number of replies in this thread
+    pub reply_count: i64,
+    /// Timestamp of the last post to this thread
+    pub last_reply_at: i64,
+    /// Timestamp of the last time the user viewed this thread
+    pub last_viewed_at: i64,
+    /// List of users participating in this thread (user IDs or full user objects if extended=true)
+    #[serde(default)]
+    pub participants: Vec<serde_json::Value>,
+    /// The root post of the thread
+    pub post: MattermostPost,
+    /// Number of unread replies
+    #[serde(default)]
+    pub unread_replies: i64,
+    /// Number of unread mentions
+    #[serde(default)]
+    pub unread_mentions: i64,
+}
+
+/// Response wrapper for a list of threads
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserThreads {
+    /// Total count of threads
+    #[serde(default)]
+    pub total: i64,
+    /// Total count of unread threads
+    #[serde(default)]
+    pub total_unread_threads: i64,
+    /// Total count of unread mentions across all threads
+    #[serde(default)]
+    pub total_unread_mentions: i64,
+    /// List of threads
+    #[serde(default)]
+    pub threads: Vec<UserThread>,
+}
+
+/// Response for thread read/follow operations
+/// Most operations return 200 OK with no body, but we need this for consistent handling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadResponse {
+    #[serde(default)]
+    pub status: String,
+}
+
 impl From<MattermostEmoji> for crate::types::Emoji {
     fn from(mm_emoji: MattermostEmoji) -> Self {
         crate::types::Emoji {
