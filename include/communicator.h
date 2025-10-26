@@ -888,6 +888,84 @@ CommunicatorErrorCode communicator_platform_send_typing_indicator(
 );
 
 // ============================================================================
+// Thread Operations
+// ============================================================================
+
+/**
+ * Get a thread (root post and all replies)
+ *
+ * Fetches a complete thread including the root post and all replies.
+ *
+ * @param platform The platform handle
+ * @param post_id The ID of any post in the thread (typically the root post)
+ * @return A JSON string representing a Vec<Message>
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_thread(
+    CommunicatorPlatform platform,
+    const char* post_id
+);
+
+/**
+ * Start following a thread
+ *
+ * Makes the authenticated user follow a thread to receive notifications for new replies.
+ *
+ * @param platform The platform handle
+ * @param thread_id The thread ID (typically the root post ID)
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_follow_thread(
+    CommunicatorPlatform platform,
+    const char* thread_id
+);
+
+/**
+ * Stop following a thread
+ *
+ * Makes the authenticated user unfollow a thread to stop receiving notifications.
+ *
+ * @param platform The platform handle
+ * @param thread_id The thread ID (typically the root post ID)
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_unfollow_thread(
+    CommunicatorPlatform platform,
+    const char* thread_id
+);
+
+/**
+ * Mark a thread as read
+ *
+ * Marks all messages in a thread as read up to the current time.
+ *
+ * @param platform The platform handle
+ * @param thread_id The thread ID (typically the root post ID)
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_mark_thread_read(
+    CommunicatorPlatform platform,
+    const char* thread_id
+);
+
+/**
+ * Mark a thread as unread from a specific post
+ *
+ * Marks a thread as unread, typically from a specific post onwards.
+ *
+ * @param platform The platform handle
+ * @param thread_id The thread ID (typically the root post ID)
+ * @param post_id The post ID to mark as unread from
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_mark_thread_unread(
+    CommunicatorPlatform platform,
+    const char* thread_id,
+    const char* post_id
+);
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 
