@@ -37,6 +37,8 @@ const (
 	ErrorPermDenied     ErrorCode = 9
 	ErrorTimeout        ErrorCode = 10
 	ErrorInvalidState   ErrorCode = 11
+	ErrorUnsupported    ErrorCode = 12
+	ErrorRateLimited    ErrorCode = 13
 )
 
 var initialized bool

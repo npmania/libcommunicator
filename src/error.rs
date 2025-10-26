@@ -38,6 +38,8 @@ pub enum ErrorCode {
     InvalidState = 11,
     /// Feature not supported by this platform
     Unsupported = 12,
+    /// Rate limit exceeded
+    RateLimited = 13,
 }
 
 impl ErrorCode {
@@ -56,6 +58,7 @@ impl ErrorCode {
             ErrorCode::Timeout => "Timeout",
             ErrorCode::InvalidState => "Invalid state",
             ErrorCode::Unsupported => "Feature not supported",
+            ErrorCode::RateLimited => "Rate limit exceeded",
         }
     }
 }

@@ -185,6 +185,7 @@ pub unsafe extern "C" fn communicator_error_code_string(code: ErrorCode) -> *con
         ErrorCode::Timeout => "Timeout\0",
         ErrorCode::InvalidState => "Invalid state\0",
         ErrorCode::Unsupported => "Feature not supported\0",
+        ErrorCode::RateLimited => "Rate limit exceeded\0",
     };
     s.as_ptr() as *const c_char
 }

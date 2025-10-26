@@ -6,6 +6,17 @@ use url::Url;
 use crate::error::{Error, ErrorCode, Result};
 use crate::types::{ConnectionInfo, ConnectionState};
 
+/// Rate limit information from Mattermost API response headers
+#[derive(Debug, Clone)]
+pub struct RateLimitInfo {
+    /// Maximum requests allowed per second
+    pub limit: u32,
+    /// Requests remaining in current window
+    pub remaining: u32,
+    /// UTC epoch seconds when the limit resets
+    pub reset_at: u64,
+}
+
 /// Mattermost client for interacting with Mattermost servers
 pub struct MattermostClient {
     /// HTTP client for REST API calls
@@ -20,6 +31,8 @@ pub struct MattermostClient {
     team_id: Arc<RwLock<Option<String>>>,
     /// Current user ID after authentication
     user_id: Arc<RwLock<Option<String>>>,
+    /// Rate limit information from last API response
+    rate_limit_info: Arc<RwLock<Option<RateLimitInfo>>>,
 }
 
 impl MattermostClient {
@@ -46,6 +59,7 @@ impl MattermostClient {
             state: Arc::new(RwLock::new(ConnectionState::Disconnected)),
             team_id: Arc::new(RwLock::new(None)),
             user_id: Arc::new(RwLock::new(None)),
+            rate_limit_info: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -121,6 +135,85 @@ impl MattermostClient {
         }
 
         info
+    }
+
+    /// Get the current rate limit information
+    ///
+    /// # Returns
+    /// The most recent rate limit info from API responses, or None if no requests have been made yet
+    pub async fn get_rate_limit_info(&self) -> Option<RateLimitInfo> {
+        self.rate_limit_info.read().await.clone()
+    }
+
+    /// Extract rate limit information from response headers
+    ///
+    /// # Arguments
+    /// * `response` - The HTTP response containing rate limit headers
+    ///
+    /// # Returns
+    /// RateLimitInfo if all headers are present and valid, None otherwise
+    fn extract_rate_limit_info(&self, response: &reqwest::Response) -> Option<RateLimitInfo> {
+        let headers = response.headers();
+
+        let limit = headers
+            .get("X-Ratelimit-Limit")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u32>().ok())?;
+
+        let remaining = headers
+            .get("X-Ratelimit-Remaining")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u32>().ok())?;
+
+        let reset_at = headers
+            .get("X-Ratelimit-Reset")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok())?;
+
+        Some(RateLimitInfo {
+            limit,
+            remaining,
+            reset_at,
+        })
+    }
+
+    /// Update stored rate limit info from a response
+    async fn update_rate_limit_info(&self, response: &reqwest::Response) {
+        if let Some(info) = self.extract_rate_limit_info(response) {
+            let mut rate_limit = self.rate_limit_info.write().await;
+            *rate_limit = Some(info);
+        }
+    }
+
+    /// Retry an operation with exponential backoff when rate limited
+    ///
+    /// # Arguments
+    /// * `operation` - The async operation to retry
+    /// * `max_retries` - Maximum number of retry attempts (default: 3)
+    ///
+    /// # Returns
+    /// Result from the operation, or the last error if all retries failed
+    pub async fn with_retry<F, T, Fut>(&self, operation: F, max_retries: u32) -> Result<T>
+    where
+        F: Fn() -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let mut retries = 0;
+        let mut backoff_ms = 1000u64; // Start with 1 second
+
+        loop {
+            match operation().await {
+                Ok(result) => return Ok(result),
+                Err(e) if e.code == ErrorCode::RateLimited && retries < max_retries => {
+                    retries += 1;
+
+                    // Use exponential backoff: 1s, 2s, 4s, 8s, etc.
+                    tokio::time::sleep(tokio::time::Duration::from_millis(backoff_ms)).await;
+                    backoff_ms = backoff_ms.saturating_mul(2).min(30000); // Cap at 30 seconds
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 
     /// Build the full API URL for a given endpoint
@@ -234,11 +327,25 @@ impl MattermostClient {
     pub async fn handle_response<T: serde::de::DeserializeOwned>(&self, response: reqwest::Response) -> Result<T> {
         let status = response.status();
 
+        // Extract and store rate limit info from headers
+        self.update_rate_limit_info(&response).await;
+
         if status.is_success() {
             response
                 .json::<T>()
                 .await
                 .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to parse response: {e}")))
+        } else if status.as_u16() == 429 {
+            // Rate limited - return specific error
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Rate limit exceeded".to_string());
+
+            Err(Error::new(
+                ErrorCode::RateLimited,
+                format!("Rate limit exceeded: {error_text}"),
+            ))
         } else {
             let error_text = response
                 .text()
@@ -341,5 +448,46 @@ mod tests {
 
         client.set_state(ConnectionState::Connected).await;
         assert_eq!(client.get_state().await, ConnectionState::Connected);
+    }
+
+    #[test]
+    fn test_rate_limit_info_creation() {
+        let info = RateLimitInfo {
+            limit: 100,
+            remaining: 50,
+            reset_at: 1234567890,
+        };
+
+        assert_eq!(info.limit, 100);
+        assert_eq!(info.remaining, 50);
+        assert_eq!(info.reset_at, 1234567890);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limit_tracking() {
+        let client = MattermostClient::new("https://mattermost.example.com").unwrap();
+
+        // Initially no rate limit info
+        assert!(client.get_rate_limit_info().await.is_none());
+
+        // Simulate setting rate limit info (would normally come from headers)
+        let info = RateLimitInfo {
+            limit: 100,
+            remaining: 95,
+            reset_at: 1234567890,
+        };
+
+        {
+            let mut rate_limit = client.rate_limit_info.write().await;
+            *rate_limit = Some(info.clone());
+        }
+
+        // Verify we can retrieve it
+        let retrieved = client.get_rate_limit_info().await;
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.limit, 100);
+        assert_eq!(retrieved.remaining, 95);
+        assert_eq!(retrieved.reset_at, 1234567890);
     }
 }
