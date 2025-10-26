@@ -12,3 +12,32 @@ Cargo.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Compiled binaries and executables
+*.exe
+*.out
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Go binaries (executables in examples directories)
+bindings/go/examples/**/[!.]*
+!bindings/go/examples/**/*.go
+!bindings/go/examples/**/*.mod
+!bindings/go/examples/**/*.sum
+!bindings/go/examples/**/go.mod
+!bindings/go/examples/**/go.sum
+
+# C/C++ example binaries
+examples/**/[!.]*
+!examples/**/*.c
+!examples/**/*.h
+!examples/**/Makefile
+
+# Build artifacts
+*.o
+*.obj
+*.d
+*.dSYM/
