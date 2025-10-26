@@ -1446,6 +1446,91 @@ pub unsafe extern "C" fn communicator_platform_send_typing_indicator(
     }
 }
 
+/// FFI function: Request statuses for all users via WebSocket
+/// Returns the sequence number on success, or -1 on error
+/// The actual status data will arrive as a Response event with matching seq_reply
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_request_all_statuses(
+    handle: PlatformHandle
+) -> i64 {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return -1;
+    }
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.request_all_statuses()) {
+        Ok(seq) => seq,
+        Err(e) => {
+            error::set_last_error(e);
+            -1
+        }
+    }
+}
+
+/// FFI function: Request statuses for specific users via WebSocket
+/// Returns the sequence number on success, or -1 on error
+/// The actual status data will arrive as a Response event with matching seq_reply
+///
+/// # Arguments
+/// * `handle` - The platform handle
+/// * `user_ids_json` - JSON array of user IDs (e.g., ["user1", "user2"])
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_request_users_statuses(
+    handle: PlatformHandle,
+    user_ids_json: *const c_char,
+) -> i64 {
+    error::clear_last_error();
+
+    if handle.is_null() || user_ids_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return -1;
+    }
+
+    let user_ids_json_str = {
+        match std::ffi::CStr::from_ptr(user_ids_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return -1;
+            }
+        }
+    };
+
+    // Parse JSON array of user IDs
+    let user_ids: Vec<String> = match serde_json::from_str(user_ids_json_str) {
+        Ok(ids) => ids,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                format!("Failed to parse user IDs JSON: {}", e),
+            ));
+            return -1;
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.request_users_statuses(user_ids)) {
+        Ok(seq) => seq,
+        Err(e) => {
+            error::set_last_error(e);
+            -1
+        }
+    }
+}
+
 /// FFI function: Subscribe to real-time events
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]

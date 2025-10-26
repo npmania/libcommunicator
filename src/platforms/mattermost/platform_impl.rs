@@ -493,6 +493,30 @@ impl Platform for MattermostPlatform {
         Ok(status_map)
     }
 
+    async fn request_all_statuses(&self) -> Result<i64> {
+        let ws_lock = self.websocket.lock().await;
+        if let Some(ws) = ws_lock.as_ref() {
+            ws.get_statuses().await
+        } else {
+            Err(Error::new(
+                ErrorCode::InvalidState,
+                "WebSocket not connected. Call subscribe_events first.",
+            ))
+        }
+    }
+
+    async fn request_users_statuses(&self, user_ids: Vec<String>) -> Result<i64> {
+        let ws_lock = self.websocket.lock().await;
+        if let Some(ws) = ws_lock.as_ref() {
+            ws.get_statuses_by_ids(user_ids).await
+        } else {
+            Err(Error::new(
+                ErrorCode::InvalidState,
+                "WebSocket not connected. Call subscribe_events first.",
+            ))
+        }
+    }
+
     async fn get_team_by_name(&self, team_name: &str) -> Result<Team> {
         let mm_team = self.client.get_team_by_name(team_name).await?;
         Ok(mm_team.into())

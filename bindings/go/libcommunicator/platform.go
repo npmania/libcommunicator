@@ -287,6 +287,58 @@ func (p *Platform) CreateDirectChannel(userID string) (*Channel, error) {
 	return &channel, nil
 }
 
+// RequestAllStatuses requests statuses for all users via WebSocket (async operation)
+//
+// This is a non-blocking operation that returns immediately with a sequence number.
+// The actual status data will arrive later as a Response event with matching SeqReply.
+// Requires an active WebSocket connection (call SubscribeEvents first).
+//
+// Returns the sequence number on success, or error on failure.
+func (p *Platform) RequestAllStatuses() (int64, error) {
+	if p.handle == nil {
+		return -1, ErrInvalidHandle
+	}
+
+	seq := C.communicator_platform_request_all_statuses(p.handle)
+	if seq == -1 {
+		return -1, getLastError()
+	}
+
+	return int64(seq), nil
+}
+
+// RequestUsersStatuses requests statuses for specific users via WebSocket (async operation)
+//
+// This is a non-blocking operation that returns immediately with a sequence number.
+// The actual status data will arrive later as a Response event with matching SeqReply.
+// Requires an active WebSocket connection (call SubscribeEvents first).
+//
+// Parameters:
+//   - userIDs: List of user IDs to get statuses for
+//
+// Returns the sequence number on success, or error on failure.
+func (p *Platform) RequestUsersStatuses(userIDs []string) (int64, error) {
+	if p.handle == nil {
+		return -1, ErrInvalidHandle
+	}
+
+	// Marshal user IDs to JSON
+	jsonBytes, err := json.Marshal(userIDs)
+	if err != nil {
+		return -1, err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	seq := C.communicator_platform_request_users_statuses(p.handle, cs)
+	if seq == -1 {
+		return -1, getLastError()
+	}
+
+	return int64(seq), nil
+}
+
 // SubscribeEvents subscribes to real-time events
 func (p *Platform) SubscribeEvents() error {
 	if p.handle == nil {

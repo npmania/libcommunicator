@@ -609,6 +609,44 @@ pub trait Platform: Send + Sync {
         Err(crate::error::Error::unsupported("Batch user status not supported by this platform"))
     }
 
+    /// Request statuses for all users via WebSocket (async operation)
+    ///
+    /// This method sends a WebSocket request to get statuses for all users.
+    /// Unlike `get_users_status`, this is non-blocking and returns immediately with a sequence number.
+    /// The actual status data will arrive later as a `Response` event with matching `seq_reply`.
+    ///
+    /// # Returns
+    /// The sequence number of the request. Match this with `seq_reply` in Response events.
+    ///
+    /// # Notes
+    /// - Requires an active WebSocket connection (call `subscribe_events` first)
+    /// - Not all platforms support WebSocket-based status queries
+    /// - The response will be a `PlatformEvent::Response` with status data
+    async fn request_all_statuses(&self) -> Result<i64> {
+        Err(crate::error::Error::unsupported("WebSocket status queries not supported by this platform"))
+    }
+
+    /// Request statuses for specific users via WebSocket (async operation)
+    ///
+    /// This method sends a WebSocket request to get statuses for specific users.
+    /// Unlike `get_users_status`, this is non-blocking and returns immediately with a sequence number.
+    /// The actual status data will arrive later as a `Response` event with matching `seq_reply`.
+    ///
+    /// # Arguments
+    /// * `user_ids` - List of user IDs to get statuses for
+    ///
+    /// # Returns
+    /// The sequence number of the request. Match this with `seq_reply` in Response events.
+    ///
+    /// # Notes
+    /// - Requires an active WebSocket connection (call `subscribe_events` first)
+    /// - Not all platforms support WebSocket-based status queries
+    /// - The response will be a `PlatformEvent::Response` with status data
+    async fn request_users_statuses(&self, user_ids: Vec<String>) -> Result<i64> {
+        let _ = user_ids;
+        Err(crate::error::Error::unsupported("WebSocket status queries not supported by this platform"))
+    }
+
     /// Send a typing indicator to a channel
     ///
     /// # Arguments

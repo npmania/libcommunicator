@@ -416,6 +416,34 @@ char* communicator_platform_create_direct_channel(
 );
 
 /**
+ * Request statuses for all users via WebSocket (async operation)
+ *
+ * This is a non-blocking operation that returns immediately with a sequence number.
+ * The actual status data will arrive later as a Response event with matching seq_reply.
+ * Requires an active WebSocket connection (call subscribe_events first).
+ *
+ * @param platform The platform handle
+ * @return The sequence number on success, or -1 on error
+ */
+int64_t communicator_platform_request_all_statuses(CommunicatorPlatform platform);
+
+/**
+ * Request statuses for specific users via WebSocket (async operation)
+ *
+ * This is a non-blocking operation that returns immediately with a sequence number.
+ * The actual status data will arrive later as a Response event with matching seq_reply.
+ * Requires an active WebSocket connection (call subscribe_events first).
+ *
+ * @param platform The platform handle
+ * @param user_ids_json JSON array of user IDs (e.g., "[\"user1\", \"user2\"]")
+ * @return The sequence number on success, or -1 on error
+ */
+int64_t communicator_platform_request_users_statuses(
+    CommunicatorPlatform platform,
+    const char* user_ids_json
+);
+
+/**
  * Subscribe to real-time events
  *
  * @param platform The platform handle
