@@ -677,6 +677,58 @@ impl Platform for MattermostPlatform {
             .mark_thread_as_unread(user_id, &team_id, thread_id, post_id)
             .await
     }
+
+    // ========================================================================
+    // User Preferences and Notifications
+    // ========================================================================
+
+    async fn get_user_preferences(&self, user_id: &str) -> Result<String> {
+        let prefs = self.client.get_user_preferences(user_id).await?;
+        serde_json::to_string(&prefs)
+            .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to serialize preferences: {e}")))
+    }
+
+    async fn set_user_preferences(&self, user_id: &str, preferences_json: &str) -> Result<()> {
+        let prefs: Vec<super::types::UserPreference> = serde_json::from_str(preferences_json)
+            .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Failed to parse preferences JSON: {e}")))?;
+
+        self.client.set_user_preferences(user_id, &prefs).await
+    }
+
+    async fn mute_channel(&self, channel_id: &str) -> Result<()> {
+        let user_id = self
+            .client
+            .get_user_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidState, "User not authenticated"))?;
+
+        self.client.mute_channel(channel_id, &user_id).await
+    }
+
+    async fn unmute_channel(&self, channel_id: &str) -> Result<()> {
+        let user_id = self
+            .client
+            .get_user_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidState, "User not authenticated"))?;
+
+        self.client.unmute_channel(channel_id, &user_id).await
+    }
+
+    async fn update_channel_notify_props(&self, channel_id: &str, notify_props_json: &str) -> Result<()> {
+        let user_id = self
+            .client
+            .get_user_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidState, "User not authenticated"))?;
+
+        let props: super::types::ChannelNotifyProps = serde_json::from_str(notify_props_json)
+            .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Failed to parse notify props JSON: {e}")))?;
+
+        self.client
+            .update_channel_notify_props(channel_id, &user_id, &props)
+            .await
+    }
 }
 
 #[cfg(test)]
