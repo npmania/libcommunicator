@@ -447,6 +447,20 @@ impl Platform for MattermostPlatform {
         self.client.remove_reaction(message_id, emoji).await
     }
 
+    async fn pin_post(&self, message_id: &str) -> Result<()> {
+        self.client.pin_post(message_id).await
+    }
+
+    async fn unpin_post(&self, message_id: &str) -> Result<()> {
+        self.client.unpin_post(message_id).await
+    }
+
+    async fn get_pinned_posts(&self, channel_id: &str) -> Result<Vec<Message>> {
+        let mm_posts = self.client.get_pinned_posts(channel_id).await?;
+        let messages: Vec<Message> = mm_posts.into_iter().map(|p| p.into()).collect();
+        Ok(messages)
+    }
+
     async fn get_emojis(&self, page: u32, per_page: u32) -> Result<Vec<crate::types::Emoji>> {
         let mm_emojis = self.client.get_emojis(page, per_page, "name").await?;
         Ok(mm_emojis.into_iter().map(|e| e.into()).collect())

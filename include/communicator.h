@@ -619,6 +619,44 @@ CommunicatorErrorCode communicator_platform_remove_reaction(
 );
 
 /**
+ * Pin a message/post to its channel
+ *
+ * @param platform The platform handle
+ * @param message_id The ID of the message to pin
+ * @return COMMUNICATOR_SUCCESS on success, error code on failure
+ */
+CommunicatorErrorCode communicator_platform_pin_post(
+    CommunicatorPlatform platform,
+    const char* message_id
+);
+
+/**
+ * Unpin a message/post from its channel
+ *
+ * @param platform The platform handle
+ * @param message_id The ID of the message to unpin
+ * @return COMMUNICATOR_SUCCESS on success, error code on failure
+ */
+CommunicatorErrorCode communicator_platform_unpin_post(
+    CommunicatorPlatform platform,
+    const char* message_id
+);
+
+/**
+ * Get all pinned messages/posts for a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The ID of the channel
+ * @return A JSON string containing an array of pinned messages
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_pinned_posts(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
  * Get a list of custom emojis
  *
  * @param platform The platform handle

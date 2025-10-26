@@ -10,6 +10,7 @@ mod channels;
 mod client;
 mod convert;
 mod files;
+mod pinned;
 mod platform_impl;
 mod posts;
 mod reactions;
