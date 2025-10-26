@@ -588,6 +588,22 @@ CommunicatorErrorCode communicator_platform_remove_reaction(
     const char* emoji_name
 );
 
+/**
+ * Get a list of custom emojis
+ *
+ * @param platform The platform handle
+ * @param page The page number to retrieve (0-indexed)
+ * @param per_page Number of emojis per page
+ * @return A JSON string representing a Vec<Emoji>
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_emojis(
+    CommunicatorPlatform platform,
+    uint32_t page,
+    uint32_t per_page
+);
+
 // ============================================================================
 // Extended Channel Operations
 // ============================================================================

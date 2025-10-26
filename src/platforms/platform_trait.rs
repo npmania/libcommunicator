@@ -473,6 +473,24 @@ pub trait Platform: Send + Sync {
         Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
     }
 
+    /// Get a list of custom emojis available on the platform
+    ///
+    /// # Arguments
+    /// * `page` - The page number to retrieve (0-indexed)
+    /// * `per_page` - Number of emojis per page
+    ///
+    /// # Returns
+    /// A list of custom emojis
+    ///
+    /// # Notes
+    /// - This returns custom emojis only, not standard Unicode emojis
+    /// - Not all platforms may support custom emojis
+    /// - Default implementation returns an unsupported error
+    async fn get_emojis(&self, page: u32, per_page: u32) -> Result<Vec<crate::types::Emoji>> {
+        let _ = (page, per_page);
+        Err(crate::error::Error::unsupported("Custom emojis not supported by this platform"))
+    }
+
     /// Get a channel by name
     ///
     /// # Arguments

@@ -550,6 +550,26 @@ func (p *Platform) RemoveReaction(messageID, emojiName string) error {
 	return nil
 }
 
+// GetEmojis retrieves a list of custom emojis from the platform
+func (p *Platform) GetEmojis(page, perPage uint32) ([]Emoji, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cstr := C.communicator_platform_get_emojis(p.handle, C.uint32_t(page), C.uint32_t(perPage))
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var emojis []Emoji
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &emojis); err != nil {
+		return nil, err
+	}
+
+	return emojis, nil
+}
+
 // GetChannelByName gets a channel by name
 func (p *Platform) GetChannelByName(teamID, channelName string) (*Channel, error) {
 	if p.handle == nil {

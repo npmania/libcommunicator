@@ -251,6 +251,47 @@ impl MattermostClient {
             ))
         }
     }
+
+    /// Get a list of custom emojis
+    ///
+    /// # Arguments
+    /// * `page` - The page to select (default: 0)
+    /// * `per_page` - The number of emojis per page (default: 60, max: 200)
+    /// * `sort` - Either empty string for no sorting or "name" to sort by emoji names
+    ///
+    /// # Returns
+    /// A Result containing a Vec of MattermostEmoji or an Error
+    pub async fn get_emojis(&self, page: u32, per_page: u32, sort: &str) -> Result<Vec<super::types::MattermostEmoji>> {
+        let endpoint = format!("/emoji?page={}&per_page={}&sort={}", page, per_page, sort);
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a custom emoji by ID
+    ///
+    /// # Arguments
+    /// * `emoji_id` - The ID of the emoji
+    ///
+    /// # Returns
+    /// A Result containing the MattermostEmoji or an Error
+    pub async fn get_emoji_by_id(&self, emoji_id: &str) -> Result<super::types::MattermostEmoji> {
+        let endpoint = format!("/emoji/{}", emoji_id);
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a custom emoji by name
+    ///
+    /// # Arguments
+    /// * `emoji_name` - The name of the emoji (without colons)
+    ///
+    /// # Returns
+    /// A Result containing the MattermostEmoji or an Error
+    pub async fn get_emoji_by_name(&self, emoji_name: &str) -> Result<super::types::MattermostEmoji> {
+        let endpoint = format!("/emoji/name/{}", emoji_name);
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
 }
 
 #[cfg(test)]

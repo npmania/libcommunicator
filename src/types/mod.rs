@@ -5,6 +5,7 @@
 pub mod capabilities;
 pub mod channel;
 pub mod connection;
+pub mod emoji;
 pub mod message;
 pub mod team;
 pub mod user;
@@ -13,6 +14,7 @@ pub mod user;
 pub use capabilities::PlatformCapabilities;
 pub use channel::{Channel, ChannelType};
 pub use connection::{ConnectionInfo, ConnectionState};
+pub use emoji::Emoji;
 pub use message::{Attachment, Message};
 pub use team::{Team, TeamType};
 pub use user::User;

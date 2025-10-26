@@ -12,7 +12,10 @@ pub mod types;
 pub use context::{Context, LogCallback, LogLevel};
 pub use error::{Error, ErrorCode, Result};
 pub use platforms::{Platform, PlatformConfig, PlatformEvent};
-pub use types::{Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Message, Team, TeamType, User};
+pub use types::{
+    Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Emoji, Message, Team,
+    TeamType, User,
+};
 
 // Library version information
 pub const VERSION_MAJOR: u32 = 0;
@@ -2387,6 +2390,54 @@ pub unsafe extern "C" fn communicator_platform_remove_reaction(
             let code = e.code;
             error::set_last_error(e);
             code
+        }
+    }
+}
+
+/// FFI function: Get a list of custom emojis
+/// Returns a JSON string representing a Vec<Emoji>
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_emojis(
+    handle: PlatformHandle,
+    page: u32,
+    per_page: u32,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_emojis(page, per_page)) {
+        Ok(emojis) => {
+            match serde_json::to_string(&emojis) {
+                Ok(json_str) => {
+                    match CString::new(json_str) {
+                        Ok(c_str) => c_str.into_raw(),
+                        Err(_) => {
+                            error::set_last_error(Error::invalid_utf8());
+                            std::ptr::null_mut()
+                        }
+                    }
+                }
+                Err(e) => {
+                    error::set_last_error(Error::new(ErrorCode::Unknown, format!("Failed to serialize emojis: {e}")));
+                    std::ptr::null_mut()
+                }
+            }
+        }
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
         }
     }
 }

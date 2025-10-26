@@ -398,6 +398,34 @@ pub struct GetStatusesByIdsRequest {
     pub user_ids: Vec<String>,
 }
 
+/// Mattermost custom emoji object from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MattermostEmoji {
+    /// The ID of the emoji
+    pub id: String,
+    /// The ID of the user that created the emoji
+    pub creator_id: String,
+    /// The name of the emoji
+    pub name: String,
+    /// The time in milliseconds the emoji was created
+    pub create_at: i64,
+    /// The time in milliseconds the emoji was last updated
+    pub update_at: i64,
+    /// The time in milliseconds the emoji was deleted (0 if not deleted)
+    pub delete_at: i64,
+}
+
+impl From<MattermostEmoji> for crate::types::Emoji {
+    fn from(mm_emoji: MattermostEmoji) -> Self {
+        crate::types::Emoji {
+            id: mm_emoji.id,
+            name: mm_emoji.name,
+            creator_id: mm_emoji.creator_id,
+            created_at: mm_emoji.create_at,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

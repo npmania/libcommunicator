@@ -148,6 +148,29 @@ func main() {
 	}
 
 	// ========================================================================
+	// 9. Get custom emojis
+	// ========================================================================
+	fmt.Println("9. Getting custom emojis...")
+	emojis, err := platform.GetEmojis(0, 20) // Get first page, 20 emojis
+	if err != nil {
+		log.Printf("Failed to get emojis: %v", err)
+	} else {
+		fmt.Printf("   Retrieved %d custom emojis\n", len(emojis))
+		if len(emojis) > 0 {
+			fmt.Println("   First few emojis:")
+			for i, emoji := range emojis {
+				if i >= 5 {
+					break
+				}
+				fmt.Printf("   [%d] :%s: (ID: %s, Creator: %s)\n", i+1, emoji.Name, emoji.ID, emoji.CreatorID)
+			}
+		} else {
+			fmt.Println("   No custom emojis found on this server")
+		}
+		fmt.Println()
+	}
+
+	// ========================================================================
 	// Optional: Send a message and add reactions (uncomment to test)
 	// ========================================================================
 	/*
@@ -190,7 +213,7 @@ func main() {
 	// ========================================================================
 	// Disconnect
 	// ========================================================================
-	fmt.Println("9. Disconnecting...")
+	fmt.Println("10. Disconnecting...")
 	if err := platform.Disconnect(); err != nil {
 		log.Printf("Failed to disconnect: %v", err)
 	} else {

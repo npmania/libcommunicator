@@ -91,6 +91,14 @@ type Reaction struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Emoji represents a custom emoji
+type Emoji struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatorID string `json:"creator_id"`
+	CreatedAt int64  `json:"created_at"` // Unix timestamp in milliseconds
+}
+
 // ConnectionInfo represents connection information
 type ConnectionInfo struct {
 	State     ConnectionState `json:"state"`

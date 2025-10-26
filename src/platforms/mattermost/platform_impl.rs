@@ -413,6 +413,11 @@ impl Platform for MattermostPlatform {
         self.client.remove_reaction(message_id, emoji).await
     }
 
+    async fn get_emojis(&self, page: u32, per_page: u32) -> Result<Vec<crate::types::Emoji>> {
+        let mm_emojis = self.client.get_emojis(page, per_page, "name").await?;
+        Ok(mm_emojis.into_iter().map(|e| e.into()).collect())
+    }
+
     async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
         let mm_channel = self.client.get_channel_by_name(team_id, channel_name).await?;
         let current_user_id = self.client.get_user_id().await;
