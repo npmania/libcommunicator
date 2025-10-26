@@ -892,6 +892,85 @@ pub trait Platform: Send + Sync {
         let _ = (thread_id, post_id);
         Err(crate::error::Error::unsupported("Thread read status not supported by this platform"))
     }
+
+    // ========================================================================
+    // Search Methods
+    // ========================================================================
+
+    /// Search for users
+    ///
+    /// # Arguments
+    /// * `query` - Search term to match against username, display name, or email
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    /// List of matching users
+    ///
+    /// # Notes
+    /// Not all platforms support user search. The search behavior (exact match vs.
+    /// fuzzy search, searchable fields) may vary by platform.
+    async fn search_users(&self, query: &str, limit: usize) -> Result<Vec<User>> {
+        let _ = (query, limit);
+        Err(crate::error::Error::unsupported("User search not supported by this platform"))
+    }
+
+    /// Autocomplete users for mentions
+    ///
+    /// Provides a filtered list of users suitable for autocomplete/typeahead features,
+    /// typically when typing @mentions.
+    ///
+    /// # Arguments
+    /// * `channel_id` - Limit results to users in this channel
+    /// * `query` - Username prefix to autocomplete
+    /// * `limit` - Maximum number of results
+    ///
+    /// # Returns
+    /// List of matching users
+    ///
+    /// # Notes
+    /// Not all platforms support user autocomplete. Results are typically ordered
+    /// by relevance (e.g., users in the channel first, then other team members).
+    async fn autocomplete_users(&self, channel_id: &str, query: &str, limit: usize) -> Result<Vec<User>> {
+        let _ = (channel_id, query, limit);
+        Err(crate::error::Error::unsupported("User autocomplete not supported by this platform"))
+    }
+
+    /// Search for channels
+    ///
+    /// # Arguments
+    /// * `query` - Search term to match against channel name or display name
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    /// List of matching channels
+    ///
+    /// # Notes
+    /// Not all platforms support channel search. The search typically includes
+    /// public channels and private channels the user is a member of.
+    async fn search_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
+        let _ = (query, limit);
+        Err(crate::error::Error::unsupported("Channel search not supported by this platform"))
+    }
+
+    /// Autocomplete channels for references
+    ///
+    /// Provides a filtered list of channels suitable for autocomplete/typeahead features,
+    /// typically when typing ~channel-references.
+    ///
+    /// # Arguments
+    /// * `query` - Channel name prefix to autocomplete
+    /// * `limit` - Maximum number of results
+    ///
+    /// # Returns
+    /// List of matching channels
+    ///
+    /// # Notes
+    /// Not all platforms support channel autocomplete. Results typically include
+    /// channels the user has access to.
+    async fn autocomplete_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
+        let _ = (query, limit);
+        Err(crate::error::Error::unsupported("Channel autocomplete not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

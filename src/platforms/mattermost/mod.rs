@@ -14,6 +14,7 @@ mod pinned;
 mod platform_impl;
 mod posts;
 mod reactions;
+mod search;
 mod status;
 mod teams;
 mod threads;
@@ -25,4 +26,8 @@ pub use cache::Cache;
 pub use client::{MattermostClient, RateLimitInfo};
 pub use convert::{status_string_to_user_status, user_status_to_status_string};
 pub use platform_impl::MattermostPlatform;
+pub use search::{
+    ChannelSearchRequest, FileSearchRequest, FileSearchResponse, FileSearchResult,
+    PostSearchOptions, UserSearchRequest,
+};
 pub use types::*;

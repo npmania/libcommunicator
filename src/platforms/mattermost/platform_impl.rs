@@ -379,27 +379,36 @@ impl Platform for MattermostPlatform {
     }
 
     async fn search_messages(&self, query: &str, limit: usize) -> Result<Vec<Message>> {
-        // Get team ID from client state
-        let team_id = self.client.get_team_id().await.ok_or_else(|| {
-            Error::new(
-                ErrorCode::InvalidState,
-                "Team ID not set - call connect() with a team_id or set it manually",
-            )
-        })?;
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
 
-        let post_list = self.client.search_posts(&team_id, query).await?;
+        // Use advanced search with pagination
+        let options = crate::platforms::mattermost::PostSearchOptions {
+            is_or_search: false,
+            include_deleted_channels: false,
+            time_zone_offset: 0,
+            page: 0,
+            per_page: limit as u32,
+        };
 
-        // Convert posts to messages, limited by the requested limit
+        let post_list = self
+            .client
+            .search_posts_advanced(&team_id, query, options)
+            .await?;
+
+        // Convert posts to messages
         let mut messages: Vec<Message> = post_list
             .order
             .iter()
-            .take(limit)
             .filter_map(|post_id| post_list.posts.get(post_id))
             .map(|post| post.clone().into())
             .collect();
 
-        // Reverse to get most recent first
-        messages.reverse();
+        // Limit to requested number
+        messages.truncate(limit);
 
         Ok(messages)
     }
@@ -676,6 +685,84 @@ impl Platform for MattermostPlatform {
         self.client
             .mark_thread_as_unread(user_id, &team_id, thread_id, post_id)
             .await
+    }
+
+    async fn search_users(&self, query: &str, limit: usize) -> Result<Vec<User>> {
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        let request = crate::platforms::mattermost::UserSearchRequest::new(query.to_string())
+            .with_team_id(team_id)
+            .with_limit(limit as u32);
+
+        let mm_users = self.client.search_users(&request).await?;
+        Ok(mm_users.into_iter().map(|u| u.into()).collect())
+    }
+
+    async fn autocomplete_users(&self, channel_id: &str, query: &str, limit: usize) -> Result<Vec<User>> {
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        let mm_users = self
+            .client
+            .autocomplete_users(&team_id, channel_id, query, Some(limit as u32))
+            .await?;
+
+        Ok(mm_users.into_iter().map(|u| u.into()).collect())
+    }
+
+    async fn search_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        let request = crate::platforms::mattermost::ChannelSearchRequest::new(query.to_string());
+
+        let mm_channels = self.client.search_channels(&team_id, &request).await?;
+
+        // Limit results
+        let limited: Vec<_> = mm_channels.into_iter().take(limit).collect();
+
+        // Convert channels with proper DM handling
+        let current_user_id = self.client.get_user_id().await;
+        let mut channels = Vec::new();
+        for mm_channel in limited {
+            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            channels.push(channel);
+        }
+
+        Ok(channels)
+    }
+
+    async fn autocomplete_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
+        let team_id = self
+            .client
+            .get_team_id()
+            .await
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Team ID not set"))?;
+
+        let mm_channels = self.client.autocomplete_channels(&team_id, query).await?;
+
+        // Limit results
+        let limited: Vec<_> = mm_channels.into_iter().take(limit).collect();
+
+        // Convert channels with proper DM handling
+        let current_user_id = self.client.get_user_id().await;
+        let mut channels = Vec::new();
+        for mm_channel in limited {
+            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            channels.push(channel);
+        }
+
+        Ok(channels)
     }
 }
 
