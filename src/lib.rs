@@ -586,6 +586,47 @@ pub unsafe extern "C" fn communicator_platform_connect(
     }
 }
 
+/// FFI function: Connect to a platform with MFA (Multi-Factor Authentication)
+/// This is a convenience function for platforms that require MFA during login.
+///
+/// # Arguments
+/// * `handle` - Platform handle
+/// * `config_json` - JSON string with server, credentials (login_id, password, mfa_token), and optional team_id
+///
+/// # Returns
+/// ErrorCode indicating success or failure
+///
+/// # Example JSON
+/// ```json
+/// {
+///   "server": "https://mattermost.example.com",
+///   "credentials": {
+///     "login_id": "user@example.com",
+///     "password": "password123",
+///     "mfa_token": "123456"
+///   },
+///   "team_id": "optional-team-id"
+/// }
+/// ```
+///
+/// # Note
+/// If MFA is required but not provided, the error will indicate MFA is required.
+/// Check the error message for the Mattermost error ID to determine the specific issue.
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_connect_with_mfa(
+    handle: PlatformHandle,
+    config_json: *const c_char,
+) -> ErrorCode {
+    // This function is identical to communicator_platform_connect
+    // The MFA token is passed as part of the credentials map
+    // The Mattermost platform will use it if present
+    communicator_platform_connect(handle, config_json)
+}
+
 /// FFI function: Disconnect from a platform
 /// Returns ErrorCode indicating success or failure
 #[no_mangle]

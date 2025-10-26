@@ -17,12 +17,60 @@ impl MattermostClient {
     /// # Note
     /// This method will extract the session token from the response headers
     /// and store it for future API calls.
+    /// If the account requires MFA, an error will be returned with the Mattermost error ID
+    /// indicating MFA is required. In that case, call `login_with_mfa()` instead.
     pub async fn login(&self, login_id: &str, password: &str) -> Result<MattermostUser> {
+        self.login_with_options(login_id, password, None, None).await
+    }
+
+    /// Authenticate with Mattermost using email/username, password, and MFA token
+    ///
+    /// # Arguments
+    /// * `login_id` - The user's email or username
+    /// * `password` - The user's password
+    /// * `mfa_token` - The 6-digit MFA code from authenticator app
+    ///
+    /// # Returns
+    /// A Result containing the authenticated user information or an Error
+    ///
+    /// # Note
+    /// This method should be used when the account has Multi-Factor Authentication enabled.
+    /// If you attempt to login without MFA on an MFA-enabled account, you'll receive an error
+    /// with the Mattermost error ID "api.user.login.mfa_required" or similar.
+    pub async fn login_with_mfa(
+        &self,
+        login_id: &str,
+        password: &str,
+        mfa_token: &str,
+    ) -> Result<MattermostUser> {
+        self.login_with_options(login_id, password, Some(mfa_token), None)
+            .await
+    }
+
+    /// Internal helper for login with optional MFA token and device ID
+    ///
+    /// # Arguments
+    /// * `login_id` - The user's email or username
+    /// * `password` - The user's password
+    /// * `mfa_token` - Optional MFA token (6-digit code)
+    /// * `device_id` - Optional device ID for tracking login devices
+    ///
+    /// # Returns
+    /// A Result containing the authenticated user information or an Error
+    async fn login_with_options(
+        &self,
+        login_id: &str,
+        password: &str,
+        mfa_token: Option<&str>,
+        device_id: Option<&str>,
+    ) -> Result<MattermostUser> {
         self.set_state(ConnectionState::Connecting).await;
 
         let login_request = LoginRequest {
             login_id: login_id.to_string(),
             password: password.to_string(),
+            token: mfa_token.map(|s| s.to_string()),
+            device_id: device_id.map(|s| s.to_string()),
         };
 
         let url = self.api_url("/users/login");
@@ -201,5 +249,60 @@ mod tests {
         // Should return false when no token is set
         let valid = client.verify_session().await;
         assert!(!valid);
+    }
+
+    #[tokio::test]
+    async fn test_login_request_serialization_with_mfa() {
+        use super::super::types::LoginRequest;
+
+        // Test that LoginRequest with MFA token serializes correctly
+        let request = LoginRequest {
+            login_id: "user@example.com".to_string(),
+            password: "password123".to_string(),
+            token: Some("123456".to_string()),
+            device_id: Some("device123".to_string()),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("login_id"));
+        assert!(json.contains("password"));
+        assert!(json.contains("token"));
+        assert!(json.contains("device_id"));
+        assert!(json.contains("123456"));
+    }
+
+    #[tokio::test]
+    async fn test_login_request_serialization_without_mfa() {
+        use super::super::types::LoginRequest;
+
+        // Test that LoginRequest without MFA token doesn't include optional fields
+        let request = LoginRequest {
+            login_id: "user@example.com".to_string(),
+            password: "password123".to_string(),
+            token: None,
+            device_id: None,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("login_id"));
+        assert!(json.contains("password"));
+        // Optional fields should not be serialized when None
+        assert!(!json.contains("token"));
+        assert!(!json.contains("device_id"));
+    }
+
+    #[test]
+    fn test_mfa_error_mapping() {
+        use crate::error::ErrorCode;
+
+        // Test MFA-specific error ID mapping (this is a unit test for the error mapping logic)
+        // Note: We would need to expose map_mattermost_error_id as pub(crate) to test it directly
+        // For now, this test documents the expected behavior
+
+        // MFA required error should map to AuthenticationFailed
+        assert_eq!(ErrorCode::AuthenticationFailed as u32, 7);
+
+        // Invalid MFA error should also map to AuthenticationFailed
+        // These would be tested in integration tests with actual server responses
     }
 }

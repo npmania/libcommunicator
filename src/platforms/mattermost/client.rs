@@ -393,7 +393,12 @@ impl MattermostClient {
     /// The appropriate ErrorCode for this error ID
     fn map_mattermost_error_id(error_id: &str) -> ErrorCode {
         // Based on common Mattermost error ID patterns
-        if error_id.contains("invalid_credentials") || error_id.contains("login") {
+        // Check MFA-specific errors first (before general login errors)
+        if error_id.contains("mfa_required") {
+            ErrorCode::AuthenticationFailed
+        } else if error_id.contains("invalid_mfa") || error_id.contains("mfa") {
+            ErrorCode::AuthenticationFailed
+        } else if error_id.contains("invalid_credentials") || error_id.contains("login") {
             ErrorCode::AuthenticationFailed
         } else if error_id.contains("not_found") {
             ErrorCode::NotFound

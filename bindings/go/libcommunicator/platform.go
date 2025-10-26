@@ -62,6 +62,42 @@ func (p *Platform) Connect(config *PlatformConfig) error {
 	return nil
 }
 
+// ConnectWithMFA connects to the platform with Multi-Factor Authentication
+// This is a convenience method for platforms that require MFA during login.
+// The config should include mfa_token in the Credentials map.
+//
+// Example:
+//   config := &libcommunicator.PlatformConfig{
+//       Server: "https://mattermost.example.com",
+//       Credentials: map[string]string{
+//           "login_id":  "user@example.com",
+//           "password":  "password123",
+//           "mfa_token": "123456",  // 6-digit MFA code
+//       },
+//   }
+//   err := platform.ConnectWithMFA(config)
+func (p *Platform) ConnectWithMFA(config *PlatformConfig) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	// Marshal config to JSON
+	jsonBytes, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	cs, free := cStringFree(string(jsonBytes))
+	defer free()
+
+	code := C.communicator_platform_connect_with_mfa(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
 // Disconnect disconnects from the platform
 func (p *Platform) Disconnect() error {
 	if p.handle == nil {

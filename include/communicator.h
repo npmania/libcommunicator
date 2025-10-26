@@ -283,6 +283,32 @@ CommunicatorErrorCode communicator_platform_connect(
 );
 
 /**
+ * Connect to a platform with MFA (Multi-Factor Authentication)
+ * This is a convenience function for platforms that require MFA during login.
+ *
+ * @param platform Platform handle
+ * @param config_json JSON configuration string with server, credentials, and optional team_id
+ *                    Example:
+ *                    {
+ *                      "server": "https://mattermost.example.com",
+ *                      "credentials": {
+ *                        "login_id": "user@example.com",
+ *                        "password": "password123",
+ *                        "mfa_token": "123456"
+ *                      },
+ *                      "team_id": "optional-team-id"
+ *                    }
+ * @return Error code indicating success or failure
+ *
+ * @note If MFA is required but not provided, the error will indicate MFA is required.
+ *       Check the error message for the Mattermost error ID to determine the specific issue.
+ */
+CommunicatorErrorCode communicator_platform_connect_with_mfa(
+    CommunicatorPlatform platform,
+    const char* config_json
+);
+
+/**
  * Disconnect from a platform
  *
  * @param platform The platform handle

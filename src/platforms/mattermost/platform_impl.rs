@@ -114,8 +114,14 @@ impl Platform for MattermostPlatform {
             config.credentials.get("login_id"),
             config.credentials.get("password"),
         ) {
-            // Use email/username and password
-            self.client.login(login_id, password).await?;
+            // Check if MFA token is provided
+            if let Some(mfa_token) = config.credentials.get("mfa_token") {
+                // Use email/username, password, and MFA token
+                self.client.login_with_mfa(login_id, password, mfa_token).await?;
+            } else {
+                // Use email/username and password
+                self.client.login(login_id, password).await?;
+            }
         } else {
             return Err(Error::new(
                 ErrorCode::InvalidArgument,

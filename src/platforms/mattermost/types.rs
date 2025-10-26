@@ -220,6 +220,12 @@ pub struct MattermostTeam {
 pub struct LoginRequest {
     pub login_id: String,
     pub password: String,
+    /// MFA token (6-digit code from authenticator app)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// Device ID for tracking login devices
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
 }
 
 /// Channel creation request for direct messages
@@ -527,6 +533,8 @@ mod tests {
         let login = LoginRequest {
             login_id: "user@example.com".to_string(),
             password: "password123".to_string(),
+            token: None,
+            device_id: None,
         };
 
         let json = serde_json::to_string(&login).unwrap();
