@@ -68,6 +68,12 @@ impl ErrorCode {
 pub struct Error {
     pub code: ErrorCode,
     pub message: String,
+    /// Platform-specific error ID (e.g., Mattermost error ID like "api.user.login.invalid_credentials")
+    pub(crate) mattermost_error_id: Option<String>,
+    /// Request ID from server headers for debugging
+    pub(crate) request_id: Option<String>,
+    /// HTTP status code if this error came from an HTTP response
+    pub(crate) http_status: Option<u16>,
 }
 
 impl Error {
@@ -75,6 +81,9 @@ impl Error {
         Error {
             code,
             message: message.into(),
+            mattermost_error_id: None,
+            request_id: None,
+            http_status: None,
         }
     }
 
@@ -92,6 +101,39 @@ impl Error {
 
     pub fn unsupported(msg: impl Into<String>) -> Self {
         Error::new(ErrorCode::Unsupported, msg)
+    }
+
+    /// Add Mattermost-specific error ID (builder pattern)
+    pub fn with_mattermost_error_id(mut self, id: String) -> Self {
+        self.mattermost_error_id = Some(id);
+        self
+    }
+
+    /// Add request ID for debugging (builder pattern)
+    pub fn with_request_id(mut self, id: String) -> Self {
+        self.request_id = Some(id);
+        self
+    }
+
+    /// Add HTTP status code (builder pattern)
+    pub fn with_http_status(mut self, status: u16) -> Self {
+        self.http_status = Some(status);
+        self
+    }
+
+    /// Get the Mattermost error ID if available
+    pub fn mattermost_error_id(&self) -> Option<&str> {
+        self.mattermost_error_id.as_deref()
+    }
+
+    /// Get the request ID if available
+    pub fn request_id(&self) -> Option<&str> {
+        self.request_id.as_deref()
+    }
+
+    /// Get the HTTP status code if available
+    pub fn http_status(&self) -> Option<u16> {
+        self.http_status
     }
 }
 
@@ -149,5 +191,38 @@ mod tests {
         let retrieved = get_last_error();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().code, ErrorCode::InvalidArgument);
+    }
+
+    #[test]
+    fn test_error_with_additional_info() {
+        let error = Error::new(ErrorCode::NotFound, "User not found")
+            .with_mattermost_error_id("api.user.get.not_found".to_string())
+            .with_request_id("abc123".to_string())
+            .with_http_status(404);
+
+        assert_eq!(error.code, ErrorCode::NotFound);
+        assert_eq!(error.message, "User not found");
+        assert_eq!(error.mattermost_error_id(), Some("api.user.get.not_found"));
+        assert_eq!(error.request_id(), Some("abc123"));
+        assert_eq!(error.http_status(), Some(404));
+    }
+
+    #[test]
+    fn test_error_builder_pattern() {
+        let error = Error::new(ErrorCode::AuthenticationFailed, "Login failed")
+            .with_mattermost_error_id("api.user.login.invalid_credentials".to_string());
+
+        assert_eq!(error.mattermost_error_id(), Some("api.user.login.invalid_credentials"));
+        assert_eq!(error.request_id(), None);
+        assert_eq!(error.http_status(), None);
+    }
+
+    #[test]
+    fn test_error_without_additional_info() {
+        let error = Error::new(ErrorCode::Unknown, "Generic error");
+
+        assert_eq!(error.mattermost_error_id(), None);
+        assert_eq!(error.request_id(), None);
+        assert_eq!(error.http_status(), None);
     }
 }

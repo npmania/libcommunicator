@@ -415,6 +415,24 @@ pub struct MattermostEmoji {
     pub delete_at: i64,
 }
 
+/// Mattermost error response structure
+/// Based on the Mattermost API specification (lines 141-155)
+#[derive(Debug, Clone, Deserialize)]
+pub struct MattermostErrorResponse {
+    /// Error identifier (e.g., "api.user.login.invalid_credentials")
+    pub id: String,
+    /// Human-readable error message
+    pub message: String,
+    /// Request ID for debugging with server logs
+    #[serde(default)]
+    pub request_id: String,
+    /// HTTP status code
+    pub status_code: i32,
+    /// OAuth-specific error flag
+    #[serde(default)]
+    pub is_oauth: bool,
+}
+
 impl From<MattermostEmoji> for crate::types::Emoji {
     fn from(mm_emoji: MattermostEmoji) -> Self {
         crate::types::Emoji {
@@ -522,5 +540,40 @@ mod tests {
 
         let group: MattermostChannelType = serde_json::from_str("\"G\"").unwrap();
         assert!(group.is_group());
+    }
+
+    #[test]
+    fn test_mattermost_error_response_deserialization() {
+        let json = r#"{
+            "id": "api.user.login.invalid_credentials",
+            "message": "Invalid login credentials",
+            "request_id": "abc123",
+            "status_code": 401,
+            "is_oauth": false
+        }"#;
+
+        let error: MattermostErrorResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(error.id, "api.user.login.invalid_credentials");
+        assert_eq!(error.message, "Invalid login credentials");
+        assert_eq!(error.request_id, "abc123");
+        assert_eq!(error.status_code, 401);
+        assert_eq!(error.is_oauth, false);
+    }
+
+    #[test]
+    fn test_mattermost_error_response_with_defaults() {
+        // Test deserialization when optional fields are missing
+        let json = r#"{
+            "id": "api.post.create.error",
+            "message": "Failed to create post",
+            "status_code": 500
+        }"#;
+
+        let error: MattermostErrorResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(error.id, "api.post.create.error");
+        assert_eq!(error.message, "Failed to create post");
+        assert_eq!(error.request_id, ""); // default value
+        assert_eq!(error.status_code, 500);
+        assert_eq!(error.is_oauth, false); // default value
     }
 }

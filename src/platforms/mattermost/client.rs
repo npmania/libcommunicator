@@ -317,6 +317,32 @@ impl MattermostClient {
             .map_err(|e| Error::new(ErrorCode::NetworkError, format!("DELETE request failed: {e}")))
     }
 
+    /// Map Mattermost error ID to appropriate ErrorCode
+    ///
+    /// # Arguments
+    /// * `error_id` - The Mattermost error ID (e.g., "api.user.login.invalid_credentials")
+    ///
+    /// # Returns
+    /// The appropriate ErrorCode for this error ID
+    fn map_mattermost_error_id(error_id: &str) -> ErrorCode {
+        // Based on common Mattermost error ID patterns
+        if error_id.contains("invalid_credentials") || error_id.contains("login") {
+            ErrorCode::AuthenticationFailed
+        } else if error_id.contains("not_found") {
+            ErrorCode::NotFound
+        } else if error_id.contains("permission") || error_id.contains("forbidden") {
+            ErrorCode::PermissionDenied
+        } else if error_id.contains("rate_limit") {
+            ErrorCode::RateLimited
+        } else if error_id.contains("timeout") {
+            ErrorCode::Timeout
+        } else if error_id.contains("invalid_param") || error_id.contains("invalid_") {
+            ErrorCode::InvalidArgument
+        } else {
+            ErrorCode::Unknown
+        }
+    }
+
     /// Check if the response is successful and extract the JSON body
     ///
     /// # Arguments
@@ -327,35 +353,63 @@ impl MattermostClient {
     pub async fn handle_response<T: serde::de::DeserializeOwned>(&self, response: reqwest::Response) -> Result<T> {
         let status = response.status();
 
+        // Extract request ID from headers for debugging
+        let request_id = response.headers()
+            .get("X-Request-Id")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         // Extract and store rate limit info from headers
         self.update_rate_limit_info(&response).await;
 
         if status.is_success() {
+            // Success case - parse response body
             response
                 .json::<T>()
                 .await
                 .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to parse response: {e}")))
-        } else if status.as_u16() == 429 {
-            // Rate limited - return specific error
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Rate limit exceeded".to_string());
-
-            Err(Error::new(
-                ErrorCode::RateLimited,
-                format!("Rate limit exceeded: {error_text}"),
-            ))
         } else {
+            // Error case - try to parse as Mattermost error response
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            Err(Error::new(
-                ErrorCode::NetworkError,
-                format!("API request failed with status {status}: {error_text}"),
-            ))
+            // Try to parse as structured Mattermost error
+            if let Ok(mm_error) = serde_json::from_str::<super::types::MattermostErrorResponse>(&error_text) {
+                // Successfully parsed Mattermost error response
+                let error_code = Self::map_mattermost_error_id(&mm_error.id);
+                let mut error = Error::new(error_code, mm_error.message)
+                    .with_mattermost_error_id(mm_error.id)
+                    .with_http_status(status.as_u16());
+
+                if let Some(req_id) = request_id {
+                    error = error.with_request_id(req_id);
+                }
+
+                Err(error)
+            } else {
+                // Fallback for non-structured errors - infer error code from HTTP status
+                let error_code = match status.as_u16() {
+                    401 | 403 => ErrorCode::AuthenticationFailed,
+                    404 => ErrorCode::NotFound,
+                    429 => ErrorCode::RateLimited,
+                    500..=599 => ErrorCode::NetworkError,
+                    _ => ErrorCode::Unknown,
+                };
+
+                let mut error = Error::new(
+                    error_code,
+                    format!("API request failed with status {status}: {error_text}"),
+                )
+                .with_http_status(status.as_u16());
+
+                if let Some(req_id) = request_id {
+                    error = error.with_request_id(req_id);
+                }
+
+                Err(error)
+            }
         }
     }
 
@@ -489,5 +543,66 @@ mod tests {
         assert_eq!(retrieved.limit, 100);
         assert_eq!(retrieved.remaining, 95);
         assert_eq!(retrieved.reset_at, 1234567890);
+    }
+
+    #[test]
+    fn test_mattermost_error_id_mapping() {
+        // Test authentication errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.user.login.invalid_credentials"),
+            ErrorCode::AuthenticationFailed
+        );
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.user.login.failed"),
+            ErrorCode::AuthenticationFailed
+        );
+
+        // Test not found errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.user.get.not_found"),
+            ErrorCode::NotFound
+        );
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.channel.not_found"),
+            ErrorCode::NotFound
+        );
+
+        // Test permission errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.context.permissions_error"),
+            ErrorCode::PermissionDenied
+        );
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.team.forbidden"),
+            ErrorCode::PermissionDenied
+        );
+
+        // Test rate limit errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.rate_limit.exceeded"),
+            ErrorCode::RateLimited
+        );
+
+        // Test timeout errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.request.timeout"),
+            ErrorCode::Timeout
+        );
+
+        // Test invalid argument errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.post.invalid_param.message"),
+            ErrorCode::InvalidArgument
+        );
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.channel.invalid_id"),
+            ErrorCode::InvalidArgument
+        );
+
+        // Test unknown errors
+        assert_eq!(
+            MattermostClient::map_mattermost_error_id("api.unknown.error"),
+            ErrorCode::Unknown
+        );
     }
 }
