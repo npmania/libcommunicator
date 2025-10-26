@@ -4,7 +4,9 @@ use tokio::sync::Mutex;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::platforms::platform_trait::{Platform, PlatformConfig, PlatformEvent};
-use crate::types::{Attachment, Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
+use crate::types::{
+    Attachment, Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User,
+};
 
 use super::client::MattermostClient;
 use super::convert::ConversionContext;
@@ -68,8 +70,12 @@ impl MattermostPlatform {
                     match self.client.get_user(&partner_id).await {
                         Ok(partner_user) => {
                             // Build display name from partner's information
-                            let display_name = if !partner_user.first_name.is_empty() || !partner_user.last_name.is_empty() {
-                                format!("{} {}", partner_user.first_name, partner_user.last_name).trim().to_string()
+                            let display_name = if !partner_user.first_name.is_empty()
+                                || !partner_user.last_name.is_empty()
+                            {
+                                format!("{} {}", partner_user.first_name, partner_user.last_name)
+                                    .trim()
+                                    .to_string()
                             } else if !partner_user.nickname.is_empty() {
                                 partner_user.nickname.clone()
                             } else {
@@ -87,7 +93,9 @@ impl MattermostPlatform {
         }
         // For group channels, we could fetch all participants and build a name
         // For now, we'll use the existing display_name from the API
-        else if mm_channel.channel_type.is_group() && (mm_channel.display_name.is_empty() || current_user_id.is_some()) {
+        else if mm_channel.channel_type.is_group()
+            && (mm_channel.display_name.is_empty() || current_user_id.is_some())
+        {
             // Group channels may need similar treatment
             // This could be enhanced in the future to fetch all member names
             if channel.display_name.is_empty() {
@@ -117,7 +125,9 @@ impl Platform for MattermostPlatform {
             // Check if MFA token is provided
             if let Some(mfa_token) = config.credentials.get("mfa_token") {
                 // Use email/username, password, and MFA token
-                self.client.login_with_mfa(login_id, password, mfa_token).await?;
+                self.client
+                    .login_with_mfa(login_id, password, mfa_token)
+                    .await?;
             } else {
                 // Use email/username and password
                 self.client.login(login_id, password).await?;
@@ -138,10 +148,10 @@ impl Platform for MattermostPlatform {
         let current_user = self.client.get_current_user().await?;
 
         // Get connection info
-        let conn_info = self.client.connection_info(
-            &self.server_url,
-            &current_user.username
-        ).await;
+        let conn_info = self
+            .client
+            .connection_info(&self.server_url, &current_user.username)
+            .await;
         self.connection_info = Some(conn_info.clone());
 
         Ok(conn_info)
@@ -186,7 +196,9 @@ impl Platform for MattermostPlatform {
         // Convert channels with proper DM handling
         let mut channels = Vec::new();
         for mm_channel in mm_channels {
-            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            let channel = self
+                .convert_channel_with_context(mm_channel, current_user_id.as_deref())
+                .await?;
             channels.push(channel);
         }
 
@@ -196,11 +208,15 @@ impl Platform for MattermostPlatform {
     async fn get_channel(&self, channel_id: &str) -> Result<Channel> {
         let mm_channel = self.client.get_channel_cached(channel_id).await?;
         let current_user_id = self.client.get_user_id().await;
-        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
     }
 
     async fn get_messages(&self, channel_id: &str, limit: usize) -> Result<Vec<Message>> {
-        let post_list = self.client.get_latest_posts(channel_id, limit as u32).await?;
+        let post_list = self
+            .client
+            .get_latest_posts(channel_id, limit as u32)
+            .await?;
 
         // Convert posts to messages in the correct order
         let mut messages: Vec<Message> = post_list
@@ -220,9 +236,7 @@ impl Platform for MattermostPlatform {
         let mm_members = self.client.get_channel_members(channel_id).await?;
 
         // Collect all user IDs
-        let user_ids: Vec<String> = mm_members.iter()
-            .map(|m| m.user_id.clone())
-            .collect();
+        let user_ids: Vec<String> = mm_members.iter().map(|m| m.user_id.clone()).collect();
 
         // Use batch cached fetch - this is MUCH more efficient than N individual calls
         // If users are cached, this makes zero API calls
@@ -246,7 +260,8 @@ impl Platform for MattermostPlatform {
     async fn create_direct_channel(&self, user_id: &str) -> Result<Channel> {
         let mm_channel = self.client.create_direct_channel(user_id).await?;
         let current_user_id = self.client.get_user_id().await;
-        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
     }
 
     async fn get_teams(&self) -> Result<Vec<Team>> {
@@ -259,7 +274,11 @@ impl Platform for MattermostPlatform {
         Ok(mm_team.into())
     }
 
-    async fn set_status(&self, status: crate::types::user::UserStatus, custom_message: Option<&str>) -> Result<()> {
+    async fn set_status(
+        &self,
+        status: crate::types::user::UserStatus,
+        custom_message: Option<&str>,
+    ) -> Result<()> {
         let status_str = super::user_status_to_status_string(status);
         self.client.set_status(status_str).await?;
 
@@ -419,8 +438,16 @@ impl Platform for MattermostPlatform {
         Ok(messages)
     }
 
-    async fn get_messages_before(&self, channel_id: &str, before_id: &str, limit: usize) -> Result<Vec<Message>> {
-        let post_list = self.client.get_posts_before(channel_id, before_id, limit as u32).await?;
+    async fn get_messages_before(
+        &self,
+        channel_id: &str,
+        before_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
+        let post_list = self
+            .client
+            .get_posts_before(channel_id, before_id, limit as u32)
+            .await?;
 
         // Convert posts to messages in the correct order
         let mut messages: Vec<Message> = post_list
@@ -436,8 +463,16 @@ impl Platform for MattermostPlatform {
         Ok(messages)
     }
 
-    async fn get_messages_after(&self, channel_id: &str, after_id: &str, limit: usize) -> Result<Vec<Message>> {
-        let post_list = self.client.get_posts_after(channel_id, after_id, limit as u32).await?;
+    async fn get_messages_after(
+        &self,
+        channel_id: &str,
+        after_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
+        let post_list = self
+            .client
+            .get_posts_after(channel_id, after_id, limit as u32)
+            .await?;
 
         // Convert posts to messages in the correct order
         let mut messages: Vec<Message> = post_list
@@ -482,15 +517,20 @@ impl Platform for MattermostPlatform {
     }
 
     async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
-        let mm_channel = self.client.get_channel_by_name(team_id, channel_name).await?;
+        let mm_channel = self
+            .client
+            .get_channel_by_name(team_id, channel_name)
+            .await?;
         let current_user_id = self.client.get_user_id().await;
-        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
     }
 
     async fn create_group_channel(&self, user_ids: Vec<String>) -> Result<Channel> {
         let mm_channel = self.client.create_group_channel(user_ids).await?;
         let current_user_id = self.client.get_user_id().await;
-        self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
     }
 
     async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
@@ -517,7 +557,12 @@ impl Platform for MattermostPlatform {
         Ok(mm_users.into_iter().map(|u| u.into()).collect())
     }
 
-    async fn set_custom_status(&self, emoji: Option<&str>, text: &str, expires_at: Option<i64>) -> Result<()> {
+    async fn set_custom_status(
+        &self,
+        emoji: Option<&str>,
+        text: &str,
+        expires_at: Option<i64>,
+    ) -> Result<()> {
         use super::types::CustomStatus;
 
         // Convert Unix timestamp (i64) to ISO 8601 string if provided
@@ -525,8 +570,7 @@ impl Platform for MattermostPlatform {
             // Convert Unix timestamp to ISO 8601 format
             // For simplicity, using a basic conversion
             use chrono::{DateTime, Utc};
-            let datetime = DateTime::<Utc>::from_timestamp(ts, 0)
-                .unwrap_or_else(Utc::now);
+            let datetime = DateTime::<Utc>::from_timestamp(ts, 0).unwrap_or_else(Utc::now);
             datetime.to_rfc3339()
         });
 
@@ -544,7 +588,10 @@ impl Platform for MattermostPlatform {
         self.client.remove_custom_status().await
     }
 
-    async fn get_users_status(&self, user_ids: Vec<String>) -> Result<std::collections::HashMap<String, crate::types::user::UserStatus>> {
+    async fn get_users_status(
+        &self,
+        user_ids: Vec<String>,
+    ) -> Result<std::collections::HashMap<String, crate::types::user::UserStatus>> {
         let mm_statuses = self.client.get_users_status_by_ids(&user_ids).await?;
 
         let mut status_map = std::collections::HashMap::new();
@@ -708,7 +755,12 @@ impl Platform for MattermostPlatform {
         Ok(mm_users.into_iter().map(|u| u.into()).collect())
     }
 
-    async fn autocomplete_users(&self, channel_id: &str, query: &str, limit: usize) -> Result<Vec<User>> {
+    async fn autocomplete_users(
+        &self,
+        channel_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<User>> {
         let team_id = self
             .client
             .get_team_id()
@@ -741,7 +793,9 @@ impl Platform for MattermostPlatform {
         let current_user_id = self.client.get_user_id().await;
         let mut channels = Vec::new();
         for mm_channel in limited {
-            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            let channel = self
+                .convert_channel_with_context(mm_channel, current_user_id.as_deref())
+                .await?;
             channels.push(channel);
         }
 
@@ -764,7 +818,9 @@ impl Platform for MattermostPlatform {
         let current_user_id = self.client.get_user_id().await;
         let mut channels = Vec::new();
         for mm_channel in limited {
-            let channel = self.convert_channel_with_context(mm_channel, current_user_id.as_deref()).await?;
+            let channel = self
+                .convert_channel_with_context(mm_channel, current_user_id.as_deref())
+                .await?;
             channels.push(channel);
         }
 
@@ -777,13 +833,22 @@ impl Platform for MattermostPlatform {
 
     async fn get_user_preferences(&self, user_id: &str) -> Result<String> {
         let prefs = self.client.get_user_preferences(user_id).await?;
-        serde_json::to_string(&prefs)
-            .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to serialize preferences: {e}")))
+        serde_json::to_string(&prefs).map_err(|e| {
+            Error::new(
+                ErrorCode::Unknown,
+                format!("Failed to serialize preferences: {e}"),
+            )
+        })
     }
 
     async fn set_user_preferences(&self, user_id: &str, preferences_json: &str) -> Result<()> {
         let prefs: Vec<super::types::UserPreference> = serde_json::from_str(preferences_json)
-            .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Failed to parse preferences JSON: {e}")))?;
+            .map_err(|e| {
+                Error::new(
+                    ErrorCode::InvalidArgument,
+                    format!("Failed to parse preferences JSON: {e}"),
+                )
+            })?;
 
         self.client.set_user_preferences(user_id, &prefs).await
     }
@@ -808,7 +873,11 @@ impl Platform for MattermostPlatform {
         self.client.unmute_channel(channel_id, &user_id).await
     }
 
-    async fn update_channel_notify_props(&self, channel_id: &str, notify_props_json: &str) -> Result<()> {
+    async fn update_channel_notify_props(
+        &self,
+        channel_id: &str,
+        notify_props_json: &str,
+    ) -> Result<()> {
         let user_id = self
             .client
             .get_user_id()
@@ -816,7 +885,12 @@ impl Platform for MattermostPlatform {
             .ok_or_else(|| Error::new(ErrorCode::InvalidState, "User not authenticated"))?;
 
         let props: super::types::ChannelNotifyProps = serde_json::from_str(notify_props_json)
-            .map_err(|e| Error::new(ErrorCode::InvalidArgument, format!("Failed to parse notify props JSON: {e}")))?;
+            .map_err(|e| {
+                Error::new(
+                    ErrorCode::InvalidArgument,
+                    format!("Failed to parse notify props JSON: {e}"),
+                )
+            })?;
 
         self.client
             .update_channel_notify_props(channel_id, &user_id, &props)

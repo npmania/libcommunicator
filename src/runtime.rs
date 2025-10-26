@@ -71,11 +71,7 @@ where
 ///
 /// Returns None if the runtime is not initialized
 pub fn runtime_handle() -> Option<tokio::runtime::Handle> {
-    RUNTIME
-        .lock()
-        .ok()?
-        .as_ref()
-        .map(|rt| rt.handle().clone())
+    RUNTIME.lock().ok()?.as_ref().map(|rt| rt.handle().clone())
 }
 
 /// Spawn a background task on the runtime

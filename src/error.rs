@@ -212,7 +212,10 @@ mod tests {
         let error = Error::new(ErrorCode::AuthenticationFailed, "Login failed")
             .with_mattermost_error_id("api.user.login.invalid_credentials".to_string());
 
-        assert_eq!(error.mattermost_error_id(), Some("api.user.login.invalid_credentials"));
+        assert_eq!(
+            error.mattermost_error_id(),
+            Some("api.user.login.invalid_credentials")
+        );
         assert_eq!(error.request_id(), None);
         assert_eq!(error.http_status(), None);
     }

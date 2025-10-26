@@ -21,10 +21,7 @@ pub use types::{
 pub const VERSION_MAJOR: u32 = 0;
 pub const VERSION_MINOR: u32 = 1;
 pub const VERSION_PATCH: u32 = 0;
-pub const VERSION_STRING: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    " (libcommunicator)"
-);
+pub const VERSION_STRING: &str = concat!(env!("CARGO_PKG_VERSION"), " (libcommunicator)");
 
 /// FFI function: Free a string allocated by this library
 #[no_mangle]
@@ -282,7 +279,11 @@ pub unsafe extern "C" fn communicator_context_is_initialized(handle: ContextHand
     }
 
     let context = &*handle;
-    if context.is_initialized() { 1 } else { 0 }
+    if context.is_initialized() {
+        1
+    } else {
+        0
+    }
 }
 
 /// FFI function: Set a configuration value on a context
@@ -455,7 +456,9 @@ pub unsafe extern "C" fn communicator_context_set_log_callback(
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_context_clear_log_callback(handle: ContextHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_context_clear_log_callback(
+    handle: ContextHandle,
+) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -484,7 +487,9 @@ pub type PlatformHandle = *mut Box<dyn Platform>;
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_mattermost_create(server_url: *const c_char) -> PlatformHandle {
+pub unsafe extern "C" fn communicator_mattermost_create(
+    server_url: *const c_char,
+) -> PlatformHandle {
     error::clear_last_error();
 
     if server_url.is_null() {
@@ -670,7 +675,11 @@ pub unsafe extern "C" fn communicator_platform_is_connected(handle: PlatformHand
     }
 
     let platform = &**handle;
-    if platform.is_connected() { 1 } else { 0 }
+    if platform.is_connected() {
+        1
+    } else {
+        0
+    }
 }
 
 /// FFI function: Get connection info as JSON
@@ -714,10 +723,7 @@ pub unsafe extern "C" fn communicator_platform_get_connection_info(
             }
         },
         None => {
-            error::set_last_error(Error::new(
-                ErrorCode::InvalidState,
-                "Not connected",
-            ));
+            error::set_last_error(Error::new(ErrorCode::InvalidState, "Not connected"));
             std::ptr::null_mut()
         }
     }
@@ -1085,7 +1091,9 @@ pub unsafe extern "C" fn communicator_platform_get_user(
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_platform_get_current_user(handle: PlatformHandle) -> *mut c_char {
+pub unsafe extern "C" fn communicator_platform_get_current_user(
+    handle: PlatformHandle,
+) -> *mut c_char {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1495,9 +1503,7 @@ pub unsafe extern "C" fn communicator_platform_send_typing_indicator(
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_platform_request_all_statuses(
-    handle: PlatformHandle
-) -> i64 {
+pub unsafe extern "C" fn communicator_platform_request_all_statuses(handle: PlatformHandle) -> i64 {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1579,7 +1585,9 @@ pub unsafe extern "C" fn communicator_platform_request_users_statuses(
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_platform_subscribe_events(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_subscribe_events(
+    handle: PlatformHandle,
+) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1606,7 +1614,9 @@ pub unsafe extern "C" fn communicator_platform_subscribe_events(handle: Platform
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_platform_unsubscribe_events(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_unsubscribe_events(
+    handle: PlatformHandle,
+) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -1662,7 +1672,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "data": msg
                     })
                 }
-                PlatformEvent::MessageDeleted { message_id, channel_id } => {
+                PlatformEvent::MessageDeleted {
+                    message_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "message_deleted",
                         "message_id": message_id,
@@ -1676,7 +1689,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "status": status
                     })
                 }
-                PlatformEvent::UserTyping { user_id, channel_id } => {
+                PlatformEvent::UserTyping {
+                    user_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "user_typing",
                         "user_id": user_id,
@@ -1701,14 +1717,20 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::UserJoinedChannel { user_id, channel_id } => {
+                PlatformEvent::UserJoinedChannel {
+                    user_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "user_joined_channel",
                         "user_id": user_id,
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::UserLeftChannel { user_id, channel_id } => {
+                PlatformEvent::UserLeftChannel {
+                    user_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "user_left_channel",
                         "user_id": user_id,
@@ -1721,7 +1743,12 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "state": state
                     })
                 }
-                PlatformEvent::ReactionAdded { message_id, user_id, emoji_name, channel_id } => {
+                PlatformEvent::ReactionAdded {
+                    message_id,
+                    user_id,
+                    emoji_name,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "reaction_added",
                         "message_id": message_id,
@@ -1730,7 +1757,12 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::ReactionRemoved { message_id, user_id, emoji_name, channel_id } => {
+                PlatformEvent::ReactionRemoved {
+                    message_id,
+                    user_id,
+                    emoji_name,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "reaction_removed",
                         "message_id": message_id,
@@ -1751,7 +1783,11 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::PreferenceChanged { category, name, value } => {
+                PlatformEvent::PreferenceChanged {
+                    category,
+                    name,
+                    value,
+                } => {
                     serde_json::json!({
                         "type": "preference_changed",
                         "category": category,
@@ -1759,7 +1795,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "value": value
                     })
                 }
-                PlatformEvent::EphemeralMessage { message, channel_id } => {
+                PlatformEvent::EphemeralMessage {
+                    message,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "ephemeral_message",
                         "message": message,
@@ -1784,21 +1823,31 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "user_id": user_id
                     })
                 }
-                PlatformEvent::ChannelViewed { user_id, channel_id } => {
+                PlatformEvent::ChannelViewed {
+                    user_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "channel_viewed",
                         "user_id": user_id,
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::ThreadUpdated { thread_id, channel_id } => {
+                PlatformEvent::ThreadUpdated {
+                    thread_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "thread_updated",
                         "thread_id": thread_id,
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::ThreadReadChanged { thread_id, user_id, channel_id } => {
+                PlatformEvent::ThreadReadChanged {
+                    thread_id,
+                    user_id,
+                    channel_id,
+                } => {
                     serde_json::json!({
                         "type": "thread_read_changed",
                         "thread_id": thread_id,
@@ -1806,7 +1855,12 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::ThreadFollowChanged { thread_id, user_id, channel_id, following } => {
+                PlatformEvent::ThreadFollowChanged {
+                    thread_id,
+                    user_id,
+                    channel_id,
+                    following,
+                } => {
                     serde_json::json!({
                         "type": "thread_follow_changed",
                         "thread_id": thread_id,
@@ -1815,7 +1869,11 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "following": following
                     })
                 }
-                PlatformEvent::PostUnread { post_id, channel_id, user_id } => {
+                PlatformEvent::PostUnread {
+                    post_id,
+                    channel_id,
+                    user_id,
+                } => {
                     serde_json::json!({
                         "type": "post_unread",
                         "post_id": post_id,
@@ -1823,7 +1881,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "user_id": user_id
                     })
                 }
-                PlatformEvent::EmojiAdded { emoji_id, emoji_name } => {
+                PlatformEvent::EmojiAdded {
+                    emoji_id,
+                    emoji_name,
+                } => {
                     serde_json::json!({
                         "type": "emoji_added",
                         "emoji_id": emoji_id,
@@ -1860,7 +1921,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "channel_id": channel_id
                     })
                 }
-                PlatformEvent::ChannelMemberUpdated { channel_id, user_id } => {
+                PlatformEvent::ChannelMemberUpdated {
+                    channel_id,
+                    user_id,
+                } => {
                     serde_json::json!({
                         "type": "channel_member_updated",
                         "channel_id": channel_id,
@@ -1879,7 +1943,10 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "team_id": team_id
                     })
                 }
-                PlatformEvent::MemberRoleUpdated { channel_id, user_id } => {
+                PlatformEvent::MemberRoleUpdated {
+                    channel_id,
+                    user_id,
+                } => {
                     serde_json::json!({
                         "type": "member_role_updated",
                         "channel_id": channel_id,
@@ -1910,7 +1977,11 @@ pub unsafe extern "C" fn communicator_platform_poll_event(handle: PlatformHandle
                         "name": name
                     })
                 }
-                PlatformEvent::Response { status, seq_reply, error } => {
+                PlatformEvent::Response {
+                    status,
+                    seq_reply,
+                    error,
+                } => {
                     serde_json::json!({
                         "type": "response",
                         "status": status,
@@ -2261,7 +2332,11 @@ pub unsafe extern "C" fn communicator_platform_get_messages_before(
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.get_messages_before(channel_id_str, before_id_str, limit as usize)) {
+    match runtime::block_on(platform.get_messages_before(
+        channel_id_str,
+        before_id_str,
+        limit as usize,
+    )) {
         Ok(messages) => match serde_json::to_string(&messages) {
             Ok(json) => match CString::new(json) {
                 Ok(c_string) => c_string.into_raw(),
@@ -2332,7 +2407,11 @@ pub unsafe extern "C" fn communicator_platform_get_messages_after(
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.get_messages_after(channel_id_str, after_id_str, limit as usize)) {
+    match runtime::block_on(platform.get_messages_after(
+        channel_id_str,
+        after_id_str,
+        limit as usize,
+    )) {
         Ok(messages) => match serde_json::to_string(&messages) {
             Ok(json) => match CString::new(json) {
                 Ok(c_string) => c_string.into_raw(),
@@ -2572,29 +2651,25 @@ pub unsafe extern "C" fn communicator_platform_get_pinned_posts(
     let platform = &**handle;
 
     match runtime::block_on(platform.get_pinned_posts(channel_id_str)) {
-        Ok(messages) => {
-            match serde_json::to_string(&messages) {
-                Ok(json) => {
-                    match std::ffi::CString::new(json) {
-                        Ok(c_string) => c_string.into_raw(),
-                        Err(_) => {
-                            error::set_last_error(Error::new(
-                                ErrorCode::Unknown,
-                                "Failed to convert JSON to C string".to_string(),
-                            ));
-                            std::ptr::null_mut()
-                        }
-                    }
-                }
-                Err(e) => {
+        Ok(messages) => match serde_json::to_string(&messages) {
+            Ok(json) => match std::ffi::CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
                     error::set_last_error(Error::new(
                         ErrorCode::Unknown,
-                        format!("Failed to serialize pinned posts: {e}"),
+                        "Failed to convert JSON to C string".to_string(),
                     ));
                     std::ptr::null_mut()
                 }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize pinned posts: {e}"),
+                ));
+                std::ptr::null_mut()
             }
-        }
+        },
         Err(e) => {
             error::set_last_error(e);
             std::ptr::null_mut()
@@ -2626,23 +2701,22 @@ pub unsafe extern "C" fn communicator_platform_get_emojis(
     let platform = &**handle;
 
     match runtime::block_on(platform.get_emojis(page, per_page)) {
-        Ok(emojis) => {
-            match serde_json::to_string(&emojis) {
-                Ok(json_str) => {
-                    match CString::new(json_str) {
-                        Ok(c_str) => c_str.into_raw(),
-                        Err(_) => {
-                            error::set_last_error(Error::invalid_utf8());
-                            std::ptr::null_mut()
-                        }
-                    }
-                }
-                Err(e) => {
-                    error::set_last_error(Error::new(ErrorCode::Unknown, format!("Failed to serialize emojis: {e}")));
+        Ok(emojis) => match serde_json::to_string(&emojis) {
+            Ok(json_str) => match CString::new(json_str) {
+                Ok(c_str) => c_str.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::invalid_utf8());
                     std::ptr::null_mut()
                 }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize emojis: {e}"),
+                ));
+                std::ptr::null_mut()
             }
-        }
+        },
         Err(e) => {
             error::set_last_error(e);
             std::ptr::null_mut()
@@ -3160,7 +3234,9 @@ pub unsafe extern "C" fn communicator_platform_set_custom_status(
 /// # Safety
 /// This function is unsafe because it deals with raw pointers from C.
 /// The caller must ensure all pointer arguments are valid.
-pub unsafe extern "C" fn communicator_platform_remove_custom_status(handle: PlatformHandle) -> ErrorCode {
+pub unsafe extern "C" fn communicator_platform_remove_custom_status(
+    handle: PlatformHandle,
+) -> ErrorCode {
     error::clear_last_error();
 
     if handle.is_null() {
@@ -4433,7 +4509,9 @@ pub unsafe extern "C" fn communicator_platform_update_channel_notify_props(
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.update_channel_notify_props(channel_id_str, notify_props_json_str)) {
+    match runtime::block_on(
+        platform.update_channel_notify_props(channel_id_str, notify_props_json_str),
+    ) {
         Ok(()) => ErrorCode::Success,
         Err(e) => {
             let code = e.code;
@@ -4627,4 +4705,3 @@ pub unsafe extern "C" fn communicator_platform_destroy(handle: PlatformHandle) {
         let _ = Box::from_raw(handle);
     }
 }
-

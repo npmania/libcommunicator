@@ -51,9 +51,7 @@ impl MattermostClient {
         let filename = file_path
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                Error::new(ErrorCode::InvalidArgument, "Invalid file path")
-            })?;
+            .ok_or_else(|| Error::new(ErrorCode::InvalidArgument, "Invalid file path"))?;
 
         // Upload the file bytes
         self.upload_file_bytes(channel_id, filename, file_data, client_id)
@@ -96,9 +94,11 @@ impl MattermostClient {
             request = request.bearer_auth(token);
         }
 
-        let response = request.multipart(form).send().await.map_err(|e| {
-            Error::new(ErrorCode::NetworkError, format!("Upload failed: {e}"))
-        })?;
+        let response = request
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("Upload failed: {e}")))?;
 
         // Parse the response
         #[derive(serde::Deserialize)]

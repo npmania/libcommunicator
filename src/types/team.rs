@@ -38,8 +38,7 @@ pub struct Team {
 }
 
 /// Team type/visibility
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum TeamType {
     /// Open team - anyone can join
     Open,
@@ -97,7 +96,6 @@ impl Team {
         self
     }
 }
-
 
 #[cfg(test)]
 mod tests {

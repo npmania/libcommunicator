@@ -1,8 +1,8 @@
 //! User status management operations for Mattermost
 
-use crate::error::Result;
 use super::client::MattermostClient;
 use super::types::{CustomStatus, GetStatusesByIdsRequest, MattermostStatus, SetStatusRequest};
+use crate::error::Result;
 
 impl MattermostClient {
     /// Set the current user's status
@@ -59,7 +59,10 @@ impl MattermostClient {
     ///
     /// # API Endpoint
     /// POST /users/status/ids
-    pub async fn get_users_status_by_ids(&self, user_ids: &[String]) -> Result<Vec<MattermostStatus>> {
+    pub async fn get_users_status_by_ids(
+        &self,
+        user_ids: &[String],
+    ) -> Result<Vec<MattermostStatus>> {
         let request = GetStatusesByIdsRequest {
             user_ids: user_ids.to_vec(),
         };
@@ -135,8 +138,14 @@ mod tests {
     #[test]
     fn test_status_endpoints() {
         // Test endpoint construction
-        assert_eq!(format!("/users/{}/status", "user123"), "/users/user123/status");
-        assert_eq!(format!("/users/{}/status/custom", "user123"), "/users/user123/status/custom");
+        assert_eq!(
+            format!("/users/{}/status", "user123"),
+            "/users/user123/status"
+        );
+        assert_eq!(
+            format!("/users/{}/status/custom", "user123"),
+            "/users/user123/status/custom"
+        );
     }
 
     #[test]

@@ -80,7 +80,11 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the channel information or an Error
-    pub async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<MattermostChannel> {
+    pub async fn get_channel_by_name(
+        &self,
+        team_id: &str,
+        channel_name: &str,
+    ) -> Result<MattermostChannel> {
         let endpoint = format!("/teams/{team_id}/channels/name/{channel_name}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
@@ -144,7 +148,11 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the channel member information or an Error
-    pub async fn get_channel_member(&self, channel_id: &str, user_id: &str) -> Result<ChannelMember> {
+    pub async fn get_channel_member(
+        &self,
+        channel_id: &str,
+        user_id: &str,
+    ) -> Result<ChannelMember> {
         let endpoint = format!("/channels/{channel_id}/members/{user_id}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
@@ -158,7 +166,11 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the channel member information or an Error
-    pub async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<ChannelMember> {
+    pub async fn add_channel_member(
+        &self,
+        channel_id: &str,
+        user_id: &str,
+    ) -> Result<ChannelMember> {
         let body = serde_json::json!({
             "user_id": user_id,
         });
@@ -472,5 +484,4 @@ mod tests {
             Some("t1pn9rb63fnpjrqibgriijcx4r".to_string())
         );
     }
-
 }

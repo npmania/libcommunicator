@@ -79,7 +79,10 @@ impl Context {
                 "Context already initialized",
             ));
         }
-        self.log(LogLevel::Info, &format!("Initializing context '{}'", self.id));
+        self.log(
+            LogLevel::Info,
+            &format!("Initializing context '{}'", self.id),
+        );
         self.initialized = true;
         self.log(LogLevel::Info, "Context initialized successfully");
         Ok(())

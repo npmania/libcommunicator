@@ -20,7 +20,8 @@ impl MattermostClient {
     /// If the account requires MFA, an error will be returned with the Mattermost error ID
     /// indicating MFA is required. In that case, call `login_with_mfa()` instead.
     pub async fn login(&self, login_id: &str, password: &str) -> Result<MattermostUser> {
-        self.login_with_options(login_id, password, None, None).await
+        self.login_with_options(login_id, password, None, None)
+            .await
     }
 
     /// Authenticate with Mattermost using email/username, password, and MFA token

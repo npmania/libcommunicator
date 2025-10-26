@@ -406,7 +406,10 @@ mod tests {
 
         assert_eq!(request.terms, "report");
         assert_eq!(request.channel_id, Some("channel123".to_string()));
-        assert_eq!(request.ext, Some(vec!["pdf".to_string(), "doc".to_string()]));
+        assert_eq!(
+            request.ext,
+            Some(vec!["pdf".to_string(), "doc".to_string()])
+        );
         assert_eq!(request.time_zone_offset, Some(3600));
     }
 

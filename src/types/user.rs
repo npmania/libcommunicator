@@ -101,7 +101,6 @@ impl User {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,7 +125,10 @@ mod tests {
 
         assert_eq!(user.email, Some("bob@example.com".to_string()));
         assert_eq!(user.status, UserStatus::Online);
-        assert_eq!(user.avatar_url, Some("https://example.com/avatar.png".to_string()));
+        assert_eq!(
+            user.avatar_url,
+            Some("https://example.com/avatar.png".to_string())
+        );
     }
 
     #[test]

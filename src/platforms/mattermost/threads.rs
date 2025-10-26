@@ -52,9 +52,8 @@ impl MattermostClient {
         page: u32,
         per_page: u32,
     ) -> Result<UserThreads> {
-        let mut endpoint = format!(
-            "/users/{user_id}/teams/{team_id}/threads?page={page}&perPage={per_page}"
-        );
+        let mut endpoint =
+            format!("/users/{user_id}/teams/{team_id}/threads?page={page}&perPage={per_page}");
 
         if let Some(since_ts) = since {
             endpoint.push_str(&format!("&since={since_ts}"));
@@ -113,12 +112,7 @@ impl MattermostClient {
     ///
     /// # Minimum Server Version
     /// 5.29
-    pub async fn follow_thread(
-        &self,
-        user_id: &str,
-        team_id: &str,
-        thread_id: &str,
-    ) -> Result<()> {
+    pub async fn follow_thread(&self, user_id: &str, team_id: &str, thread_id: &str) -> Result<()> {
         let endpoint = format!("/users/{user_id}/teams/{team_id}/threads/{thread_id}/following");
         let response = self.put(&endpoint, &serde_json::json!({})).await?;
 
@@ -232,9 +226,8 @@ impl MattermostClient {
         thread_id: &str,
         post_id: &str,
     ) -> Result<()> {
-        let endpoint = format!(
-            "/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}"
-        );
+        let endpoint =
+            format!("/users/{user_id}/teams/{team_id}/threads/{thread_id}/set_unread/{post_id}");
         let response = self.post(&endpoint, &serde_json::json!({})).await?;
 
         if response.status().is_success() {

@@ -1,8 +1,8 @@
 //! Platform trait defining the interface all platform adapters must implement
 
 use crate::error::Result;
-use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 use crate::types::user::UserStatus;
+use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -59,9 +59,15 @@ pub enum PlatformEvent {
     /// A message was updated/edited
     MessageUpdated(Message),
     /// A message was deleted
-    MessageDeleted { message_id: String, channel_id: String },
+    MessageDeleted {
+        message_id: String,
+        channel_id: String,
+    },
     /// A user's status changed
-    UserStatusChanged { user_id: String, status: crate::types::user::UserStatus },
+    UserStatusChanged {
+        user_id: String,
+        status: crate::types::user::UserStatus,
+    },
     /// A user started typing
     UserTyping { user_id: String, channel_id: String },
     /// A channel was created
@@ -101,10 +107,7 @@ pub enum PlatformEvent {
         value: String,
     },
     /// An ephemeral message was received (temporary, typically bot responses)
-    EphemeralMessage {
-        message: String,
-        channel_id: String,
-    },
+    EphemeralMessage { message: String, channel_id: String },
     /// A new user joined the team/server
     UserAdded { user_id: String },
     /// A user's profile was updated
@@ -112,10 +115,7 @@ pub enum PlatformEvent {
     /// A user's role was updated
     UserRoleUpdated { user_id: String },
     /// A user viewed a channel
-    ChannelViewed {
-        user_id: String,
-        channel_id: String,
-    },
+    ChannelViewed { user_id: String, channel_id: String },
     /// A thread was updated (metadata changed)
     ThreadUpdated {
         thread_id: String,
@@ -146,15 +146,9 @@ pub enum PlatformEvent {
         emoji_name: String,
     },
     /// User was added to a team
-    AddedToTeam {
-        team_id: String,
-        user_id: String,
-    },
+    AddedToTeam { team_id: String, user_id: String },
     /// User left a team
-    LeftTeam {
-        team_id: String,
-        user_id: String,
-    },
+    LeftTeam { team_id: String, user_id: String },
     /// Server configuration changed
     ConfigChanged,
     /// Server license changed
@@ -162,19 +156,13 @@ pub enum PlatformEvent {
     /// Channel was converted (e.g., public to private)
     ChannelConverted { channel_id: String },
     /// Channel member was updated
-    ChannelMemberUpdated {
-        channel_id: String,
-        user_id: String,
-    },
+    ChannelMemberUpdated { channel_id: String, user_id: String },
     /// Team was deleted
     TeamDeleted { team_id: String },
     /// Team was updated
     TeamUpdated { team_id: String },
     /// Member role was updated in a channel
-    MemberRoleUpdated {
-        channel_id: String,
-        user_id: String,
-    },
+    MemberRoleUpdated { channel_id: String, user_id: String },
     /// Plugin was disabled
     PluginDisabled { plugin_id: String },
     /// Plugin was enabled
@@ -182,10 +170,7 @@ pub enum PlatformEvent {
     /// Plugin statuses changed
     PluginStatusesChanged,
     /// User preferences were deleted
-    PreferencesDeleted {
-        category: String,
-        name: String,
-    },
+    PreferencesDeleted { category: String, name: String },
     /// WebSocket action response
     Response {
         status: String,
@@ -360,7 +345,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support threading. Check `capabilities().has_threads` first.
     async fn send_reply(&self, channel_id: &str, text: &str, root_id: &str) -> Result<Message> {
         let _ = (channel_id, text, root_id);
-        Err(crate::error::Error::unsupported("Threaded messages not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Threaded messages not supported by this platform",
+        ))
     }
 
     /// Update/edit a message
@@ -376,7 +363,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support message editing. Check `capabilities().supports_message_editing` first.
     async fn update_message(&self, message_id: &str, new_text: &str) -> Result<Message> {
         let _ = (message_id, new_text);
-        Err(crate::error::Error::unsupported("Message editing not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Message editing not supported by this platform",
+        ))
     }
 
     /// Delete a message
@@ -388,7 +377,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support message deletion. Check `capabilities().supports_message_deletion` first.
     async fn delete_message(&self, message_id: &str) -> Result<()> {
         let _ = message_id;
-        Err(crate::error::Error::unsupported("Message deletion not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Message deletion not supported by this platform",
+        ))
     }
 
     /// Get a specific message by ID
@@ -400,7 +391,9 @@ pub trait Platform: Send + Sync {
     /// The message
     async fn get_message(&self, message_id: &str) -> Result<Message> {
         let _ = message_id;
-        Err(crate::error::Error::unsupported("Get message by ID not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Get message by ID not supported by this platform",
+        ))
     }
 
     /// Search for messages
@@ -416,7 +409,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support search. Check `capabilities().supports_search` first.
     async fn search_messages(&self, query: &str, limit: usize) -> Result<Vec<Message>> {
         let _ = (query, limit);
-        Err(crate::error::Error::unsupported("Message search not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Message search not supported by this platform",
+        ))
     }
 
     /// Get messages before a specific message (pagination)
@@ -428,9 +423,16 @@ pub trait Platform: Send + Sync {
     ///
     /// # Returns
     /// List of messages
-    async fn get_messages_before(&self, channel_id: &str, before_id: &str, limit: usize) -> Result<Vec<Message>> {
+    async fn get_messages_before(
+        &self,
+        channel_id: &str,
+        before_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
         let _ = (channel_id, before_id, limit);
-        Err(crate::error::Error::unsupported("Message pagination not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Message pagination not supported by this platform",
+        ))
     }
 
     /// Get messages after a specific message (pagination)
@@ -442,9 +444,16 @@ pub trait Platform: Send + Sync {
     ///
     /// # Returns
     /// List of messages
-    async fn get_messages_after(&self, channel_id: &str, after_id: &str, limit: usize) -> Result<Vec<Message>> {
+    async fn get_messages_after(
+        &self,
+        channel_id: &str,
+        after_id: &str,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
         let _ = (channel_id, after_id, limit);
-        Err(crate::error::Error::unsupported("Message pagination not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Message pagination not supported by this platform",
+        ))
     }
 
     /// Add a reaction to a message
@@ -457,7 +466,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support reactions. Check `capabilities().supports_reactions` first.
     async fn add_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
         let _ = (message_id, emoji);
-        Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Reactions not supported by this platform",
+        ))
     }
 
     /// Remove a reaction from a message
@@ -470,7 +481,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support reactions. Check `capabilities().supports_reactions` first.
     async fn remove_reaction(&self, message_id: &str, emoji: &str) -> Result<()> {
         let _ = (message_id, emoji);
-        Err(crate::error::Error::unsupported("Reactions not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Reactions not supported by this platform",
+        ))
     }
 
     /// Pin a message/post to its channel
@@ -482,7 +495,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
     async fn pin_post(&self, message_id: &str) -> Result<()> {
         let _ = message_id;
-        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Pinned posts not supported by this platform",
+        ))
     }
 
     /// Unpin a message/post from its channel
@@ -494,7 +509,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
     async fn unpin_post(&self, message_id: &str) -> Result<()> {
         let _ = message_id;
-        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Pinned posts not supported by this platform",
+        ))
     }
 
     /// Get all pinned messages/posts for a channel
@@ -509,7 +526,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support pinned posts. Check `capabilities().supports_pinned_posts` first.
     async fn get_pinned_posts(&self, channel_id: &str) -> Result<Vec<Message>> {
         let _ = channel_id;
-        Err(crate::error::Error::unsupported("Pinned posts not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Pinned posts not supported by this platform",
+        ))
     }
 
     /// Get a list of custom emojis available on the platform
@@ -527,7 +546,9 @@ pub trait Platform: Send + Sync {
     /// - Default implementation returns an unsupported error
     async fn get_emojis(&self, page: u32, per_page: u32) -> Result<Vec<crate::types::Emoji>> {
         let _ = (page, per_page);
-        Err(crate::error::Error::unsupported("Custom emojis not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Custom emojis not supported by this platform",
+        ))
     }
 
     /// Get a channel by name
@@ -540,7 +561,9 @@ pub trait Platform: Send + Sync {
     /// The channel
     async fn get_channel_by_name(&self, team_id: &str, channel_name: &str) -> Result<Channel> {
         let _ = (team_id, channel_name);
-        Err(crate::error::Error::unsupported("Get channel by name not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Get channel by name not supported by this platform",
+        ))
     }
 
     /// Create a group direct message channel
@@ -555,7 +578,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support group messages. Check `capabilities().supports_group_messages` first.
     async fn create_group_channel(&self, user_ids: Vec<String>) -> Result<Channel> {
         let _ = user_ids;
-        Err(crate::error::Error::unsupported("Group channels not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Group channels not supported by this platform",
+        ))
     }
 
     /// Add a user to a channel
@@ -565,7 +590,9 @@ pub trait Platform: Send + Sync {
     /// * `user_id` - The user ID to add
     async fn add_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
         let _ = (channel_id, user_id);
-        Err(crate::error::Error::unsupported("Channel member management not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel member management not supported by this platform",
+        ))
     }
 
     /// Remove a user from a channel
@@ -575,7 +602,9 @@ pub trait Platform: Send + Sync {
     /// * `user_id` - The user ID to remove
     async fn remove_channel_member(&self, channel_id: &str, user_id: &str) -> Result<()> {
         let _ = (channel_id, user_id);
-        Err(crate::error::Error::unsupported("Channel member management not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel member management not supported by this platform",
+        ))
     }
 
     /// Get a user by username
@@ -587,7 +616,9 @@ pub trait Platform: Send + Sync {
     /// The user
     async fn get_user_by_username(&self, username: &str) -> Result<User> {
         let _ = username;
-        Err(crate::error::Error::unsupported("User lookup by username not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User lookup by username not supported by this platform",
+        ))
     }
 
     /// Get a user by email
@@ -599,7 +630,9 @@ pub trait Platform: Send + Sync {
     /// The user
     async fn get_user_by_email(&self, email: &str) -> Result<User> {
         let _ = email;
-        Err(crate::error::Error::unsupported("User lookup by email not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User lookup by email not supported by this platform",
+        ))
     }
 
     /// Get multiple users by their IDs (batch operation)
@@ -611,7 +644,9 @@ pub trait Platform: Send + Sync {
     /// List of users
     async fn get_users_by_ids(&self, user_ids: Vec<String>) -> Result<Vec<User>> {
         let _ = user_ids;
-        Err(crate::error::Error::unsupported("Batch user lookup not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Batch user lookup not supported by this platform",
+        ))
     }
 
     /// Set a custom status message
@@ -623,9 +658,16 @@ pub trait Platform: Send + Sync {
     ///
     /// # Notes
     /// Not all platforms support custom status. Check `capabilities().supports_custom_status` first.
-    async fn set_custom_status(&self, emoji: Option<&str>, text: &str, expires_at: Option<i64>) -> Result<()> {
+    async fn set_custom_status(
+        &self,
+        emoji: Option<&str>,
+        text: &str,
+        expires_at: Option<i64>,
+    ) -> Result<()> {
         let _ = (emoji, text, expires_at);
-        Err(crate::error::Error::unsupported("Custom status not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Custom status not supported by this platform",
+        ))
     }
 
     /// Remove/clear the current user's custom status
@@ -633,7 +675,9 @@ pub trait Platform: Send + Sync {
     /// # Notes
     /// Not all platforms support custom status. Check `capabilities().supports_custom_status` first.
     async fn remove_custom_status(&self) -> Result<()> {
-        Err(crate::error::Error::unsupported("Custom status not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Custom status not supported by this platform",
+        ))
     }
 
     /// Get status for multiple users (batch operation)
@@ -643,9 +687,14 @@ pub trait Platform: Send + Sync {
     ///
     /// # Returns
     /// Map of user_id to status
-    async fn get_users_status(&self, user_ids: Vec<String>) -> Result<std::collections::HashMap<String, UserStatus>> {
+    async fn get_users_status(
+        &self,
+        user_ids: Vec<String>,
+    ) -> Result<std::collections::HashMap<String, UserStatus>> {
         let _ = user_ids;
-        Err(crate::error::Error::unsupported("Batch user status not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Batch user status not supported by this platform",
+        ))
     }
 
     /// Request statuses for all users via WebSocket (async operation)
@@ -662,7 +711,9 @@ pub trait Platform: Send + Sync {
     /// - Not all platforms support WebSocket-based status queries
     /// - The response will be a `PlatformEvent::Response` with status data
     async fn request_all_statuses(&self) -> Result<i64> {
-        Err(crate::error::Error::unsupported("WebSocket status queries not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "WebSocket status queries not supported by this platform",
+        ))
     }
 
     /// Request statuses for specific users via WebSocket (async operation)
@@ -683,7 +734,9 @@ pub trait Platform: Send + Sync {
     /// - The response will be a `PlatformEvent::Response` with status data
     async fn request_users_statuses(&self, user_ids: Vec<String>) -> Result<i64> {
         let _ = user_ids;
-        Err(crate::error::Error::unsupported("WebSocket status queries not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "WebSocket status queries not supported by this platform",
+        ))
     }
 
     /// Send a typing indicator to a channel
@@ -698,7 +751,9 @@ pub trait Platform: Send + Sync {
     /// Typing indicators are typically short-lived (cleared after a few seconds of no activity).
     async fn send_typing_indicator(&self, channel_id: &str, parent_id: Option<&str>) -> Result<()> {
         let _ = (channel_id, parent_id);
-        Err(crate::error::Error::unsupported("Typing indicators not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Typing indicators not supported by this platform",
+        ))
     }
 
     /// Get a team by name
@@ -713,7 +768,9 @@ pub trait Platform: Send + Sync {
     /// Only applicable for platforms with workspaces. Check `capabilities().has_workspaces` first.
     async fn get_team_by_name(&self, team_name: &str) -> Result<Team> {
         let _ = team_name;
-        Err(crate::error::Error::unsupported("Team lookup by name not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Team lookup by name not supported by this platform",
+        ))
     }
 
     /// Set the active team/workspace ID
@@ -726,7 +783,9 @@ pub trait Platform: Send + Sync {
     /// This affects operations that are team-scoped, such as getting channels or searching messages.
     async fn set_team_id(&self, team_id: Option<String>) -> Result<()> {
         let _ = team_id;
-        Err(crate::error::Error::unsupported("Setting team ID not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Setting team ID not supported by this platform",
+        ))
     }
 
     // ========================================================================
@@ -748,7 +807,9 @@ pub trait Platform: Send + Sync {
     /// when sending a message to attach the file.
     async fn upload_file(&self, channel_id: &str, file_path: &std::path::Path) -> Result<String> {
         let _ = (channel_id, file_path);
-        Err(crate::error::Error::unsupported("File uploads not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "File uploads not supported by this platform",
+        ))
     }
 
     /// Download a file by its ID
@@ -763,7 +824,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support file downloads. Check `capabilities().supports_file_attachments` first.
     async fn download_file(&self, file_id: &str) -> Result<Vec<u8>> {
         let _ = file_id;
-        Err(crate::error::Error::unsupported("File downloads not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "File downloads not supported by this platform",
+        ))
     }
 
     /// Get metadata for a file without downloading it
@@ -779,7 +842,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support this operation. Check `capabilities().supports_file_attachments` first.
     async fn get_file_metadata(&self, file_id: &str) -> Result<crate::types::Attachment> {
         let _ = file_id;
-        Err(crate::error::Error::unsupported("File metadata not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "File metadata not supported by this platform",
+        ))
     }
 
     /// Download a thumbnail for a file
@@ -796,7 +861,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support thumbnails.
     async fn get_file_thumbnail(&self, file_id: &str) -> Result<Vec<u8>> {
         let _ = file_id;
-        Err(crate::error::Error::unsupported("File thumbnails not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "File thumbnails not supported by this platform",
+        ))
     }
 
     // ========================================================================
@@ -818,7 +885,9 @@ pub trait Platform: Send + Sync {
     /// The returned messages should include the root post plus all replies.
     async fn get_thread(&self, post_id: &str) -> Result<Vec<Message>> {
         let _ = post_id;
-        Err(crate::error::Error::unsupported("Thread operations not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Thread operations not supported by this platform",
+        ))
     }
 
     /// Start following a thread
@@ -836,7 +905,9 @@ pub trait Platform: Send + Sync {
     /// Some platforms may automatically follow threads when you participate in them.
     async fn follow_thread(&self, thread_id: &str) -> Result<()> {
         let _ = thread_id;
-        Err(crate::error::Error::unsupported("Thread following not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Thread following not supported by this platform",
+        ))
     }
 
     /// Stop following a thread
@@ -853,7 +924,9 @@ pub trait Platform: Send + Sync {
     /// Not all platforms support thread following.
     async fn unfollow_thread(&self, thread_id: &str) -> Result<()> {
         let _ = thread_id;
-        Err(crate::error::Error::unsupported("Thread following not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Thread following not supported by this platform",
+        ))
     }
 
     /// Mark a thread as read
@@ -871,7 +944,9 @@ pub trait Platform: Send + Sync {
     /// This method marks the thread as read up to the current timestamp.
     async fn mark_thread_read(&self, thread_id: &str) -> Result<()> {
         let _ = thread_id;
-        Err(crate::error::Error::unsupported("Thread read status not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Thread read status not supported by this platform",
+        ))
     }
 
     /// Mark a thread as unread
@@ -890,7 +965,9 @@ pub trait Platform: Send + Sync {
     /// The behavior may vary - some platforms mark from the specified post, others mark the entire thread.
     async fn mark_thread_unread(&self, thread_id: &str, post_id: &str) -> Result<()> {
         let _ = (thread_id, post_id);
-        Err(crate::error::Error::unsupported("Thread read status not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Thread read status not supported by this platform",
+        ))
     }
 
     // ========================================================================
@@ -911,7 +988,9 @@ pub trait Platform: Send + Sync {
     /// fuzzy search, searchable fields) may vary by platform.
     async fn search_users(&self, query: &str, limit: usize) -> Result<Vec<User>> {
         let _ = (query, limit);
-        Err(crate::error::Error::unsupported("User search not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User search not supported by this platform",
+        ))
     }
 
     /// Autocomplete users for mentions
@@ -930,9 +1009,16 @@ pub trait Platform: Send + Sync {
     /// # Notes
     /// Not all platforms support user autocomplete. Results are typically ordered
     /// by relevance (e.g., users in the channel first, then other team members).
-    async fn autocomplete_users(&self, channel_id: &str, query: &str, limit: usize) -> Result<Vec<User>> {
+    async fn autocomplete_users(
+        &self,
+        channel_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<User>> {
         let _ = (channel_id, query, limit);
-        Err(crate::error::Error::unsupported("User autocomplete not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User autocomplete not supported by this platform",
+        ))
     }
 
     /// Search for channels
@@ -949,7 +1035,9 @@ pub trait Platform: Send + Sync {
     /// public channels and private channels the user is a member of.
     async fn search_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
         let _ = (query, limit);
-        Err(crate::error::Error::unsupported("Channel search not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel search not supported by this platform",
+        ))
     }
 
     /// Autocomplete channels for references
@@ -969,7 +1057,9 @@ pub trait Platform: Send + Sync {
     /// channels the user has access to.
     async fn autocomplete_channels(&self, query: &str, limit: usize) -> Result<Vec<Channel>> {
         let _ = (query, limit);
-        Err(crate::error::Error::unsupported("Channel autocomplete not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel autocomplete not supported by this platform",
+        ))
     }
 
     // ========================================================================
@@ -989,7 +1079,9 @@ pub trait Platform: Send + Sync {
     /// Returns a platform-specific JSON representation.
     async fn get_user_preferences(&self, user_id: &str) -> Result<String> {
         let _ = user_id;
-        Err(crate::error::Error::unsupported("User preferences not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User preferences not supported by this platform",
+        ))
     }
 
     /// Set user preferences from a JSON string
@@ -1006,7 +1098,9 @@ pub trait Platform: Send + Sync {
     /// Accepts a platform-specific JSON representation.
     async fn set_user_preferences(&self, user_id: &str, preferences_json: &str) -> Result<()> {
         let _ = (user_id, preferences_json);
-        Err(crate::error::Error::unsupported("User preferences not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "User preferences not supported by this platform",
+        ))
     }
 
     /// Mute a channel for the current user
@@ -1022,7 +1116,9 @@ pub trait Platform: Send + Sync {
     /// The exact behavior may vary by platform.
     async fn mute_channel(&self, channel_id: &str) -> Result<()> {
         let _ = channel_id;
-        Err(crate::error::Error::unsupported("Channel muting not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel muting not supported by this platform",
+        ))
     }
 
     /// Unmute a channel for the current user
@@ -1037,7 +1133,9 @@ pub trait Platform: Send + Sync {
     /// Unmuting a channel typically restores default notification settings.
     async fn unmute_channel(&self, channel_id: &str) -> Result<()> {
         let _ = channel_id;
-        Err(crate::error::Error::unsupported("Channel muting not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel muting not supported by this platform",
+        ))
     }
 
     /// Update channel notification properties from a JSON string
@@ -1052,9 +1150,15 @@ pub trait Platform: Send + Sync {
     /// # Notes
     /// The structure of notification properties varies by platform.
     /// Accepts a platform-specific JSON representation.
-    async fn update_channel_notify_props(&self, channel_id: &str, notify_props_json: &str) -> Result<()> {
+    async fn update_channel_notify_props(
+        &self,
+        channel_id: &str,
+        notify_props_json: &str,
+    ) -> Result<()> {
         let _ = (channel_id, notify_props_json);
-        Err(crate::error::Error::unsupported("Channel notification settings not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel notification settings not supported by this platform",
+        ))
     }
 
     /// Mark a channel as viewed (read) by the current user
@@ -1073,7 +1177,9 @@ pub trait Platform: Send + Sync {
     /// automatically mark channels as read when messages are retrieved.
     async fn view_channel(&self, channel_id: &str) -> Result<()> {
         let _ = channel_id;
-        Err(crate::error::Error::unsupported("Channel viewing not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel viewing not supported by this platform",
+        ))
     }
 
     /// Get unread message information for a specific channel
@@ -1092,7 +1198,9 @@ pub trait Platform: Send + Sync {
     /// or an error if the platform doesn't support this feature.
     async fn get_channel_unread(&self, channel_id: &str) -> Result<crate::types::ChannelUnread> {
         let _ = channel_id;
-        Err(crate::error::Error::unsupported("Channel unread tracking not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Channel unread tracking not supported by this platform",
+        ))
     }
 
     /// Get unread counts for all channels in a specific team/workspace
@@ -1111,7 +1219,9 @@ pub trait Platform: Send + Sync {
     /// Check PlatformCapabilities.has_workspaces before using this method.
     async fn get_team_unreads(&self, team_id: &str) -> Result<Vec<crate::types::ChannelUnread>> {
         let _ = team_id;
-        Err(crate::error::Error::unsupported("Team unread tracking not supported by this platform"))
+        Err(crate::error::Error::unsupported(
+            "Team unread tracking not supported by this platform",
+        ))
     }
 }
 
@@ -1127,7 +1237,10 @@ mod tests {
             .with_extra("timeout", "30");
 
         assert_eq!(config.server, "https://chat.example.com");
-        assert_eq!(config.credentials.get("token"), Some(&"secret-token".to_string()));
+        assert_eq!(
+            config.credentials.get("token"),
+            Some(&"secret-token".to_string())
+        );
         assert_eq!(config.team_id, Some("team-123".to_string()));
         assert_eq!(config.extra.get("timeout"), Some(&"30".to_string()));
     }

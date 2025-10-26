@@ -8,6 +8,7 @@ import "C"
 import (
 	"encoding/json"
 	"runtime"
+	"unsafe"
 )
 
 // Platform represents a chat platform (Mattermost, Slack, etc.)
@@ -1274,6 +1275,101 @@ func (p *Platform) MarkThreadUnread(threadID, postID string) error {
 	defer freePostID()
 
 	result := C.communicator_platform_mark_thread_unread(p.handle, csThreadID, csPostID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// CreateChannel creates a new regular channel (public or private)
+func (p *Platform) CreateChannel(teamID, name, displayName string, isPrivate bool) (*Channel, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csTeamID, freeTeamID := cStringFree(teamID)
+	defer freeTeamID()
+
+	csName, freeName := cStringFree(name)
+	defer freeName()
+
+	csDisplayName, freeDisplayName := cStringFree(displayName)
+	defer freeDisplayName()
+
+	var privateInt C.int
+	if isPrivate {
+		privateInt = 1
+	}
+
+	result := C.communicator_platform_create_channel(p.handle, csTeamID, csName, csDisplayName, privateInt)
+	if result == nil {
+		return nil, getLastError()
+	}
+	defer C.communicator_free_string(result)
+
+	jsonStr := C.GoString(result)
+	var channel Channel
+	if err := json.Unmarshal([]byte(jsonStr), &channel); err != nil {
+		return nil, &PlatformError{Code: ErrorUnknown, Message: "failed to parse channel JSON: " + err.Error()}
+	}
+
+	return &channel, nil
+}
+
+// UpdateChannel updates channel information (partial update)
+// Pass empty string for fields that should not be updated
+func (p *Platform) UpdateChannel(channelID, displayName, purpose, header string) (*Channel, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	var csDisplayName *C.char
+	if displayName != "" {
+		csDisplayName, _ = cStringFree(displayName)
+		defer C.free(unsafe.Pointer(csDisplayName))
+	}
+
+	var csPurpose *C.char
+	if purpose != "" {
+		csPurpose, _ = cStringFree(purpose)
+		defer C.free(unsafe.Pointer(csPurpose))
+	}
+
+	var csHeader *C.char
+	if header != "" {
+		csHeader, _ = cStringFree(header)
+		defer C.free(unsafe.Pointer(csHeader))
+	}
+
+	result := C.communicator_platform_update_channel(p.handle, csChannelID, csDisplayName, csPurpose, csHeader)
+	if result == nil {
+		return nil, getLastError()
+	}
+	defer C.communicator_free_string(result)
+
+	jsonStr := C.GoString(result)
+	var channel Channel
+	if err := json.Unmarshal([]byte(jsonStr), &channel); err != nil {
+		return nil, &PlatformError{Code: ErrorUnknown, Message: "failed to parse channel JSON: " + err.Error()}
+	}
+
+	return &channel, nil
+}
+
+// DeleteChannel deletes (archives) a channel
+func (p *Platform) DeleteChannel(channelID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	result := C.communicator_platform_delete_channel(p.handle, csChannelID)
 	if result != C.COMMUNICATOR_SUCCESS {
 		return getLastError()
 	}

@@ -1,8 +1,8 @@
 //! Team management operations for Mattermost
 
-use crate::error::Result;
 use super::client::MattermostClient;
 use super::types::MattermostTeam;
+use crate::error::Result;
 
 impl MattermostClient {
     /// Get all teams the current user belongs to
@@ -58,6 +58,9 @@ mod tests {
     fn test_team_endpoints() {
         // Test endpoint construction
         assert_eq!(format!("/teams/{}", "team123"), "/teams/team123");
-        assert_eq!(format!("/teams/name/{}", "engineering"), "/teams/name/engineering");
+        assert_eq!(
+            format!("/teams/name/{}", "engineering"),
+            "/teams/name/engineering"
+        );
     }
 }

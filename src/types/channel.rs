@@ -187,28 +187,41 @@ mod tests {
             .with_members(vec!["user-1".to_string(), "user-2".to_string()]);
 
         assert_eq!(channel.topic, Some("Team discussions".to_string()));
-        assert_eq!(channel.purpose, Some("Internal team communication".to_string()));
+        assert_eq!(
+            channel.purpose,
+            Some("Internal team communication".to_string())
+        );
         assert_eq!(channel.member_ids.as_ref().unwrap().len(), 2);
     }
 
     #[test]
     fn test_direct_message_channel() {
-        let dm = Channel::new("dm-1", "alice-bob", "Alice & Bob", ChannelType::DirectMessage);
+        let dm = Channel::new(
+            "dm-1",
+            "alice-bob",
+            "Alice & Bob",
+            ChannelType::DirectMessage,
+        );
         assert!(dm.is_direct_message());
         assert!(!dm.is_public());
     }
 
     #[test]
     fn test_public_channel() {
-        let public = Channel::new("ch-1", "announcements", "Announcements", ChannelType::Public);
+        let public = Channel::new(
+            "ch-1",
+            "announcements",
+            "Announcements",
+            ChannelType::Public,
+        );
         assert!(public.is_public());
         assert!(!public.is_direct_message());
     }
 
     #[test]
     fn test_archived_channel() {
-        let channel = Channel::new("ch-1", "old-project", "Old Project", ChannelType::Private)
-            .archived();
+        let channel =
+            Channel::new("ch-1", "old-project", "Old Project", ChannelType::Private).archived();
         assert!(channel.is_archived);
     }
 

@@ -28,7 +28,12 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the created post or an Error
-    pub async fn send_reply(&self, channel_id: &str, message: &str, root_id: &str) -> Result<MattermostPost> {
+    pub async fn send_reply(
+        &self,
+        channel_id: &str,
+        message: &str,
+        root_id: &str,
+    ) -> Result<MattermostPost> {
         let request = CreatePostRequest::new(channel_id.to_string(), message.to_string())
             .with_root_id(root_id.to_string());
 
@@ -155,9 +160,7 @@ impl MattermostClient {
         post_id: &str,
         per_page: u32,
     ) -> Result<PostList> {
-        let endpoint = format!(
-            "/channels/{channel_id}/posts?before={post_id}&per_page={per_page}"
-        );
+        let endpoint = format!("/channels/{channel_id}/posts?before={post_id}&per_page={per_page}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
@@ -177,9 +180,7 @@ impl MattermostClient {
         post_id: &str,
         per_page: u32,
     ) -> Result<PostList> {
-        let endpoint = format!(
-            "/channels/{channel_id}/posts?after={post_id}&per_page={per_page}"
-        );
+        let endpoint = format!("/channels/{channel_id}/posts?after={post_id}&per_page={per_page}");
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }

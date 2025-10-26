@@ -719,10 +719,7 @@ mod tests {
 
     #[test]
     fn test_create_post_request() {
-        let req = CreatePostRequest::new(
-            "channel123".to_string(),
-            "Hello, world!".to_string(),
-        );
+        let req = CreatePostRequest::new("channel123".to_string(), "Hello, world!".to_string());
 
         assert_eq!(req.channel_id, "channel123");
         assert_eq!(req.message, "Hello, world!");
@@ -732,11 +729,8 @@ mod tests {
 
     #[test]
     fn test_create_post_request_with_root_id() {
-        let req = CreatePostRequest::new(
-            "channel123".to_string(),
-            "Reply!".to_string(),
-        )
-        .with_root_id("post456".to_string());
+        let req = CreatePostRequest::new("channel123".to_string(), "Reply!".to_string())
+            .with_root_id("post456".to_string());
 
         assert_eq!(req.root_id, Some("post456".to_string()));
     }

@@ -108,7 +108,12 @@ impl MattermostClient {
         let http_client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("Failed to create HTTP client: {e}")))?;
+            .map_err(|e| {
+                Error::new(
+                    ErrorCode::NetworkError,
+                    format!("Failed to create HTTP client: {e}"),
+                )
+            })?;
 
         Ok(Self {
             http_client,
@@ -185,17 +190,17 @@ impl MattermostClient {
     }
 
     /// Get connection information
-    pub async fn connection_info(&self, server_url: &str, user_display_name: &str) -> ConnectionInfo {
+    pub async fn connection_info(
+        &self,
+        server_url: &str,
+        user_display_name: &str,
+    ) -> ConnectionInfo {
         let state = self.get_state().await;
         let user_id = self.user_id.read().await.clone().unwrap_or_default();
         let team_id = self.team_id.read().await.clone();
 
-        let mut info = ConnectionInfo::new(
-            "mattermost",
-            server_url,
-            user_id,
-            user_display_name,
-        ).with_state(state);
+        let mut info = ConnectionInfo::new("mattermost", server_url, user_id, user_display_name)
+            .with_state(state);
 
         if let Some(tid) = team_id {
             info = info.with_team(tid, "");
@@ -325,7 +330,11 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the reqwest::Response or an Error
-    pub async fn post<T: serde::Serialize>(&self, endpoint: &str, body: &T) -> Result<reqwest::Response> {
+    pub async fn post<T: serde::Serialize>(
+        &self,
+        endpoint: &str,
+        body: &T,
+    ) -> Result<reqwest::Response> {
         let url = self.api_url(endpoint);
         let mut request = self.http_client.post(&url);
 
@@ -348,7 +357,11 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the reqwest::Response or an Error
-    pub async fn put<T: serde::Serialize>(&self, endpoint: &str, body: &T) -> Result<reqwest::Response> {
+    pub async fn put<T: serde::Serialize>(
+        &self,
+        endpoint: &str,
+        body: &T,
+    ) -> Result<reqwest::Response> {
         let url = self.api_url(endpoint);
         let mut request = self.http_client.put(&url);
 
@@ -378,10 +391,12 @@ impl MattermostClient {
             request = request.bearer_auth(token);
         }
 
-        request
-            .send()
-            .await
-            .map_err(|e| Error::new(ErrorCode::NetworkError, format!("DELETE request failed: {e}")))
+        request.send().await.map_err(|e| {
+            Error::new(
+                ErrorCode::NetworkError,
+                format!("DELETE request failed: {e}"),
+            )
+        })
     }
 
     /// Map Mattermost error ID to appropriate ErrorCode
@@ -422,11 +437,15 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the deserialized response body or an Error
-    pub async fn handle_response<T: serde::de::DeserializeOwned>(&self, response: reqwest::Response) -> Result<T> {
+    pub async fn handle_response<T: serde::de::DeserializeOwned>(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<T> {
         let status = response.status();
 
         // Extract request ID from headers for debugging
-        let request_id = response.headers()
+        let request_id = response
+            .headers()
             .get("X-Request-Id")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
@@ -436,10 +455,9 @@ impl MattermostClient {
 
         if status.is_success() {
             // Success case - parse response body
-            response
-                .json::<T>()
-                .await
-                .map_err(|e| Error::new(ErrorCode::Unknown, format!("Failed to parse response: {e}")))
+            response.json::<T>().await.map_err(|e| {
+                Error::new(ErrorCode::Unknown, format!("Failed to parse response: {e}"))
+            })
         } else {
             // Error case - try to parse as Mattermost error response
             let error_text = response
@@ -448,7 +466,9 @@ impl MattermostClient {
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
             // Try to parse as structured Mattermost error
-            if let Ok(mm_error) = serde_json::from_str::<super::types::MattermostErrorResponse>(&error_text) {
+            if let Ok(mm_error) =
+                serde_json::from_str::<super::types::MattermostErrorResponse>(&error_text)
+            {
                 // Successfully parsed Mattermost error response
                 let error_code = Self::map_mattermost_error_id(&mm_error.id);
                 let mut error = Error::new(error_code, mm_error.message)
@@ -494,7 +514,12 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing a Vec of MattermostEmoji or an Error
-    pub async fn get_emojis(&self, page: u32, per_page: u32, sort: &str) -> Result<Vec<super::types::MattermostEmoji>> {
+    pub async fn get_emojis(
+        &self,
+        page: u32,
+        per_page: u32,
+        sort: &str,
+    ) -> Result<Vec<super::types::MattermostEmoji>> {
         let endpoint = format!("/emoji?page={}&per_page={}&sort={}", page, per_page, sort);
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
@@ -520,7 +545,10 @@ impl MattermostClient {
     ///
     /// # Returns
     /// A Result containing the MattermostEmoji or an Error
-    pub async fn get_emoji_by_name(&self, emoji_name: &str) -> Result<super::types::MattermostEmoji> {
+    pub async fn get_emoji_by_name(
+        &self,
+        emoji_name: &str,
+    ) -> Result<super::types::MattermostEmoji> {
         let endpoint = format!("/emoji/name/{}", emoji_name);
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
@@ -585,7 +613,9 @@ impl MattermostClient {
         let channel = self.get_channel(channel_id).await?;
 
         // Store in cache before returning
-        self.channel_cache.set(channel_id.to_string(), channel.clone()).await;
+        self.channel_cache
+            .set(channel_id.to_string(), channel.clone())
+            .await;
 
         Ok(channel)
     }
@@ -637,7 +667,10 @@ impl MattermostClient {
     /// # Performance
     /// If all users are cached, this makes zero API calls.
     /// Otherwise, it makes one batch API call for all uncached users.
-    pub async fn get_users_by_ids_cached(&self, user_ids: &[String]) -> Result<Vec<MattermostUser>> {
+    pub async fn get_users_by_ids_cached(
+        &self,
+        user_ids: &[String],
+    ) -> Result<Vec<MattermostUser>> {
         // Return early if caching is disabled
         if !self.cache_config.enable_cache {
             return self.get_users_by_ids(user_ids).await;
@@ -711,6 +744,29 @@ impl MattermostClient {
         self.team_cache.invalidate(team_id).await;
     }
 
+    /// Update a channel in the cache
+    ///
+    /// This is typically called after creating or updating a channel
+    /// to ensure the cache reflects the latest state.
+    ///
+    /// # Arguments
+    /// * `channel` - The channel to cache
+    pub async fn update_channel_cache(&self, channel: &MattermostChannel) {
+        self.channel_cache
+            .set(channel.id.clone(), channel.clone())
+            .await;
+    }
+
+    /// Remove a channel from the cache
+    ///
+    /// This is typically called after deleting/archiving a channel.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to remove from cache
+    pub async fn remove_channel_from_cache(&self, channel_id: &str) {
+        self.channel_cache.invalidate(channel_id).await;
+    }
+
     /// Clear all caches
     ///
     /// This is useful when major changes occur (e.g., user logout/login,
@@ -729,9 +785,21 @@ impl MattermostClient {
     /// A vector of tuples containing cache statistics
     pub async fn get_cache_stats(&self) -> Vec<(&'static str, usize, usize)> {
         vec![
-            ("user", self.user_cache.stats().await.0, self.user_cache.stats().await.1),
-            ("channel", self.channel_cache.stats().await.0, self.channel_cache.stats().await.1),
-            ("team", self.team_cache.stats().await.0, self.team_cache.stats().await.1),
+            (
+                "user",
+                self.user_cache.stats().await.0,
+                self.user_cache.stats().await.1,
+            ),
+            (
+                "channel",
+                self.channel_cache.stats().await.0,
+                self.channel_cache.stats().await.1,
+            ),
+            (
+                "team",
+                self.team_cache.stats().await.0,
+                self.team_cache.stats().await.1,
+            ),
         ]
     }
 }

@@ -81,10 +81,7 @@ impl MattermostClient {
         } else {
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::NetworkError,
-                format!(
-                    "Failed to delete user preferences: {}",
-                    response.status()
-                ),
+                format!("Failed to delete user preferences: {}", response.status()),
             ))
         }
     }

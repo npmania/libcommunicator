@@ -45,7 +45,10 @@ impl MattermostClient {
         if response.status().is_success() {
             Ok(())
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             Err(crate::error::Error::new(
                 crate::error::ErrorCode::Unknown,
                 format!("Failed to remove reaction: {error_text}"),

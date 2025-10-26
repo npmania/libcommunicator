@@ -30,8 +30,11 @@ impl ConversionContext {
 
 /// Convert a Mattermost timestamp (milliseconds since epoch) to DateTime<Utc>
 fn timestamp_to_datetime(timestamp_ms: i64) -> DateTime<Utc> {
-    DateTime::from_timestamp(timestamp_ms / 1000, ((timestamp_ms % 1000) * 1_000_000) as u32)
-        .unwrap_or_else(Utc::now)
+    DateTime::from_timestamp(
+        timestamp_ms / 1000,
+        ((timestamp_ms % 1000) * 1_000_000) as u32,
+    )
+    .unwrap_or_else(Utc::now)
 }
 
 impl MattermostUser {
@@ -39,7 +42,9 @@ impl MattermostUser {
     pub fn to_user_with_context(&self, ctx: &ConversionContext) -> User {
         // Determine display name from available fields
         let display_name = if !self.first_name.is_empty() || !self.last_name.is_empty() {
-            format!("{} {}", self.first_name, self.last_name).trim().to_string()
+            format!("{} {}", self.first_name, self.last_name)
+                .trim()
+                .to_string()
         } else if !self.nickname.is_empty() {
             self.nickname.clone()
         } else {
@@ -375,7 +380,10 @@ mod tests {
     fn test_status_string_conversion() {
         assert_eq!(status_string_to_user_status("online"), UserStatus::Online);
         assert_eq!(status_string_to_user_status("away"), UserStatus::Away);
-        assert_eq!(status_string_to_user_status("dnd"), UserStatus::DoNotDisturb);
+        assert_eq!(
+            status_string_to_user_status("dnd"),
+            UserStatus::DoNotDisturb
+        );
         assert_eq!(status_string_to_user_status("offline"), UserStatus::Offline);
         assert_eq!(status_string_to_user_status("unknown"), UserStatus::Unknown);
     }

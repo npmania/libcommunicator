@@ -348,7 +348,9 @@ mod tests {
         for i in 0..10 {
             let cache_clone = cache.clone();
             let handle = tokio::spawn(async move {
-                cache_clone.set(format!("key{}", i), format!("value{}", i)).await;
+                cache_clone
+                    .set(format!("key{}", i), format!("value{}", i))
+                    .await;
             });
             handles.push(handle);
         }

@@ -760,6 +760,58 @@ CommunicatorErrorCode communicator_platform_remove_channel_member(
     const char* user_id
 );
 
+/**
+ * Create a new regular channel (public or private)
+ *
+ * @param platform The platform handle
+ * @param team_id The team/workspace ID
+ * @param name The channel URL name (lowercase, no spaces)
+ * @param display_name The human-readable channel name
+ * @param is_private 0 for public channel, non-zero for private
+ * @return A JSON string representing the created Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_create_channel(
+    CommunicatorPlatform platform,
+    const char* team_id,
+    const char* name,
+    const char* display_name,
+    int is_private
+);
+
+/**
+ * Update channel information (partial update)
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param display_name The new display name (pass NULL to skip)
+ * @param purpose The new purpose/description (pass NULL to skip)
+ * @param header The new header text (pass NULL to skip)
+ * @return A JSON string representing the updated Channel
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_update_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* display_name,
+    const char* purpose,
+    const char* header
+);
+
+/**
+ * Delete (archive) a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to delete
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_delete_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
 // ============================================================================
 // Extended User Operations
 // ============================================================================
@@ -1176,6 +1228,54 @@ CommunicatorErrorCode communicator_platform_update_channel_notify_props(
     CommunicatorPlatform platform,
     const char* channel_id,
     const char* notify_props_json
+);
+
+// ============================================================================
+// Channel Read State
+// ============================================================================
+
+/**
+ * Mark a channel as viewed (read)
+ *
+ * Marks all messages in the channel as read up to the current time.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to mark as viewed
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_view_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Get unread information for a channel
+ *
+ * Returns message count, mention count, and last viewed time.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @return A JSON string with unread counts or NULL on error
+ *         Must be freed with communicator_free_string()
+ */
+char* communicator_platform_get_channel_unread(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
+ * Get unread counts for all channels in a team
+ *
+ * Returns an array of unread information for each channel in the team.
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID
+ * @return A JSON string with array of unread info or NULL on error
+ *         Must be freed with communicator_free_string()
+ */
+char* communicator_platform_get_team_unreads(
+    CommunicatorPlatform platform,
+    const char* team_id
 );
 
 // ============================================================================

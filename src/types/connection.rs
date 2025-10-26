@@ -105,7 +105,6 @@ impl ConnectionInfo {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
