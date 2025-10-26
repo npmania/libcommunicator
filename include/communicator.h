@@ -792,6 +792,24 @@ CommunicatorErrorCode communicator_platform_set_custom_status(
 CommunicatorErrorCode communicator_platform_remove_custom_status(CommunicatorPlatform platform);
 
 // ============================================================================
+// Typing Indicators
+// ============================================================================
+
+/**
+ * Send a typing indicator to a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID to send the typing indicator to
+ * @param parent_id The parent message ID for threaded replies (pass NULL for main channel)
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_send_typing_indicator(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* parent_id
+);
+
+// ============================================================================
 // Platform Cleanup
 // ============================================================================
 
