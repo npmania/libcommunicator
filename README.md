@@ -38,8 +38,8 @@ Features are listed generically below. Currently only Mattermost is implemented.
 - [x] Create DM/group channels (Mattermost)
 - [x] Manage members (Mattermost)
 - [x] Search channels (Mattermost)
+- [x] Channel read state tracking (Mattermost)
 - [ ] Create/update/delete channels
-- [ ] Channel read state tracking
 
 **Users:**
 - [x] Get user info (Mattermost)

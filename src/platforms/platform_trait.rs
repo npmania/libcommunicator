@@ -1056,6 +1056,63 @@ pub trait Platform: Send + Sync {
         let _ = (channel_id, notify_props_json);
         Err(crate::error::Error::unsupported("Channel notification settings not supported by this platform"))
     }
+
+    /// Mark a channel as viewed (read) by the current user
+    ///
+    /// This updates the last_viewed_at timestamp for the channel and clears
+    /// unread counts for the user.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to mark as viewed
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support explicit channel viewing. Some platforms
+    /// automatically mark channels as read when messages are retrieved.
+    async fn view_channel(&self, channel_id: &str) -> Result<()> {
+        let _ = channel_id;
+        Err(crate::error::Error::unsupported("Channel viewing not supported by this platform"))
+    }
+
+    /// Get unread message information for a specific channel
+    ///
+    /// Returns the number of unread messages and mentions for the current user
+    /// in the specified channel.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to get unread info for
+    ///
+    /// # Returns
+    /// Result containing unread information (msg_count, mention_count, last_viewed_at) or an Error
+    ///
+    /// # Notes
+    /// Not all platforms track unread counts. This method may return zeros
+    /// or an error if the platform doesn't support this feature.
+    async fn get_channel_unread(&self, channel_id: &str) -> Result<crate::types::ChannelUnread> {
+        let _ = channel_id;
+        Err(crate::error::Error::unsupported("Channel unread tracking not supported by this platform"))
+    }
+
+    /// Get unread counts for all channels in a specific team/workspace
+    ///
+    /// Returns unread message and mention counts for each channel the current
+    /// user is a member of in the specified team.
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team to get unread counts for
+    ///
+    /// # Returns
+    /// Result containing a list of channel unread information or an Error
+    ///
+    /// # Notes
+    /// Only applicable to platforms with workspace/team hierarchies.
+    /// Check PlatformCapabilities.has_workspaces before using this method.
+    async fn get_team_unreads(&self, team_id: &str) -> Result<Vec<crate::types::ChannelUnread>> {
+        let _ = team_id;
+        Err(crate::error::Error::unsupported("Team unread tracking not supported by this platform"))
+    }
 }
 
 #[cfg(test)]

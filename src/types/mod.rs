@@ -12,7 +12,7 @@ pub mod user;
 
 // Re-export for convenience
 pub use capabilities::PlatformCapabilities;
-pub use channel::{Channel, ChannelType};
+pub use channel::{Channel, ChannelType, ChannelUnread};
 pub use connection::{ConnectionInfo, ConnectionState};
 pub use emoji::Emoji;
 pub use message::{Attachment, Message};

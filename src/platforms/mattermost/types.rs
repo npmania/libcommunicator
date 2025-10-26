@@ -277,6 +277,68 @@ pub struct ChannelMember {
     pub last_update_at: i64,
 }
 
+// ============================================================================
+// Channel Read State Types
+// ============================================================================
+
+/// Request to mark a channel as viewed (read)
+#[derive(Debug, Clone, Serialize)]
+pub struct ChannelViewRequest {
+    pub channel_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_channel_id: Option<String>,
+}
+
+impl ChannelViewRequest {
+    /// Create a new channel view request
+    pub fn new(channel_id: String) -> Self {
+        Self {
+            channel_id,
+            prev_channel_id: None,
+        }
+    }
+
+    /// Set the previous channel ID (optional, for tracking channel switches)
+    pub fn with_prev_channel(mut self, prev_channel_id: String) -> Self {
+        self.prev_channel_id = Some(prev_channel_id);
+        self
+    }
+}
+
+/// Unread information for a single channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelUnreadInfo {
+    /// Team ID the channel belongs to
+    pub team_id: String,
+    /// Channel ID
+    pub channel_id: String,
+    /// Number of unread messages
+    pub msg_count: i64,
+    /// Number of unread mentions
+    pub mention_count: i64,
+    /// Timestamp when the channel was last viewed
+    pub last_viewed_at: i64,
+}
+
+/// Unread counts for a team
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamUnread {
+    /// Team ID
+    pub team_id: String,
+    /// Total unread message count across all channels in team
+    pub msg_count: i64,
+    /// Total unread mention count across all channels in team
+    pub mention_count: i64,
+}
+
+/// Response from viewing a channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelViewResponse {
+    pub status: String,
+    #[serde(default)]
+    pub last_viewed_at_times: HashMap<String, i64>,
+}
+
 /// WebSocket event from Mattermost
 #[derive(Debug, Clone, Deserialize)]
 pub struct WebSocketEvent {

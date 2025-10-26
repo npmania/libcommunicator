@@ -1,7 +1,10 @@
 use crate::error::Result;
 
 use super::client::MattermostClient;
-use super::types::{ChannelMember, CreateDirectChannelRequest, CreateGroupChannelRequest, MattermostChannel};
+use super::types::{
+    ChannelMember, ChannelUnreadInfo, ChannelViewRequest, ChannelViewResponse,
+    CreateDirectChannelRequest, CreateGroupChannelRequest, MattermostChannel, PostList, TeamUnread,
+};
 
 /// Parse a direct message channel ID to extract participant user IDs
 ///
@@ -185,6 +188,194 @@ impl MattermostClient {
                 format!("Failed to remove channel member: {}", response.status()),
             ))
         }
+    }
+
+    // ========================================================================
+    // Channel Read State Management
+    // ========================================================================
+
+    /// Mark a channel as viewed (read) by the current user
+    ///
+    /// This updates the last_viewed_at timestamp for the channel and clears
+    /// unread counts for the user.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to mark as viewed
+    /// * `prev_channel_id` - Optional ID of the previous channel (for tracking channel switches)
+    ///
+    /// # Returns
+    /// A Result containing the view response with updated timestamps or an Error
+    pub async fn view_channel(
+        &self,
+        channel_id: &str,
+        prev_channel_id: Option<String>,
+    ) -> Result<ChannelViewResponse> {
+        let user_id = self.get_user_id().await.ok_or_else(|| {
+            crate::error::Error::new(
+                crate::error::ErrorCode::InvalidState,
+                "User ID not set - ensure you're authenticated",
+            )
+        })?;
+
+        let mut request = ChannelViewRequest::new(channel_id.to_string());
+        if let Some(prev) = prev_channel_id {
+            request = request.with_prev_channel(prev);
+        }
+
+        let endpoint = format!("/channels/members/{user_id}/view");
+        let response = self.post(&endpoint, &request).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get unread message information for a specific channel
+    ///
+    /// Returns the number of unread messages and mentions for the current user
+    /// in the specified channel.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to get unread info for
+    ///
+    /// # Returns
+    /// A Result containing unread information (msg_count, mention_count, last_viewed_at) or an Error
+    pub async fn get_channel_unread(&self, channel_id: &str) -> Result<ChannelUnreadInfo> {
+        let user_id = self.get_user_id().await.ok_or_else(|| {
+            crate::error::Error::new(
+                crate::error::ErrorCode::InvalidState,
+                "User ID not set - ensure you're authenticated",
+            )
+        })?;
+
+        let endpoint = format!("/users/{user_id}/channels/{channel_id}/unread");
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get unread counts for all channels in a specific team
+    ///
+    /// Returns unread message and mention counts for each channel the current
+    /// user is a member of in the specified team.
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team to get unread counts for
+    ///
+    /// # Returns
+    /// A Result containing a list of channel unread information or an Error
+    pub async fn get_team_unreads(&self, team_id: &str) -> Result<Vec<ChannelUnreadInfo>> {
+        let user_id = self.get_user_id().await.ok_or_else(|| {
+            crate::error::Error::new(
+                crate::error::ErrorCode::InvalidState,
+                "User ID not set - ensure you're authenticated",
+            )
+        })?;
+
+        let endpoint = format!("/users/{user_id}/teams/{team_id}/channels/members");
+        let response = self.get(&endpoint).await?;
+
+        // The API returns ChannelMember objects, which we need to convert to ChannelUnreadInfo
+        let members: Vec<ChannelMember> = self.handle_response(response).await?;
+
+        Ok(members
+            .into_iter()
+            .map(|m| ChannelUnreadInfo {
+                team_id: team_id.to_string(),
+                channel_id: m.channel_id,
+                msg_count: m.msg_count,
+                mention_count: m.mention_count,
+                last_viewed_at: m.last_viewed_at,
+            })
+            .collect())
+    }
+
+    /// Get unread counts across all teams
+    ///
+    /// Returns a summary of unread message and mention counts for each team
+    /// the current user is a member of.
+    ///
+    /// # Arguments
+    /// None (uses the current authenticated user)
+    ///
+    /// # Returns
+    /// A Result containing a list of team unread summaries or an Error
+    pub async fn get_all_unreads(&self) -> Result<Vec<TeamUnread>> {
+        let user_id = self.get_user_id().await.ok_or_else(|| {
+            crate::error::Error::new(
+                crate::error::ErrorCode::InvalidState,
+                "User ID not set - ensure you're authenticated",
+            )
+        })?;
+
+        let endpoint = format!("/users/{user_id}/teams/unread");
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get unread posts for a specific channel for the current user
+    ///
+    /// Returns posts that are unread by the user, starting from their last viewed position.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to get unread posts for
+    /// * `limit_after` - Optional limit on the number of posts to retrieve after last viewed (default: 60)
+    ///
+    /// # Returns
+    /// A Result containing a PostList with unread posts or an Error
+    pub async fn get_unread_posts(
+        &self,
+        channel_id: &str,
+        limit_after: Option<i32>,
+    ) -> Result<PostList> {
+        let user_id = self.get_user_id().await.ok_or_else(|| {
+            crate::error::Error::new(
+                crate::error::ErrorCode::InvalidState,
+                "User ID not set - ensure you're authenticated",
+            )
+        })?;
+
+        let mut endpoint = format!("/users/{user_id}/channels/{channel_id}/posts/unread");
+        if let Some(limit) = limit_after {
+            endpoint.push_str(&format!("?limit_after={limit}"));
+        }
+
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
+    }
+
+    /// Get posts around the first unread message in a channel
+    ///
+    /// Returns posts before and after the first unread message, useful for
+    /// implementing "jump to first unread" functionality.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel
+    /// * `limit_before` - Optional number of posts to retrieve before the unread marker (default: 60)
+    /// * `limit_after` - Optional number of posts to retrieve after the unread marker (default: 60)
+    ///
+    /// # Returns
+    /// A Result containing a PostList with posts around the first unread or an Error
+    pub async fn get_posts_around_unread(
+        &self,
+        channel_id: &str,
+        limit_before: Option<i32>,
+        limit_after: Option<i32>,
+    ) -> Result<PostList> {
+        let mut params = Vec::new();
+
+        if let Some(before) = limit_before {
+            params.push(format!("limit_before={before}"));
+        }
+        if let Some(after) = limit_after {
+            params.push(format!("limit_after={after}"));
+        }
+
+        let query_string = if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        };
+
+        let endpoint = format!("/channels/{channel_id}/posts/unread{query_string}");
+        let response = self.get(&endpoint).await?;
+        self.handle_response(response).await
     }
 }
 

@@ -822,6 +822,38 @@ impl Platform for MattermostPlatform {
             .update_channel_notify_props(channel_id, &user_id, &props)
             .await
     }
+
+    async fn view_channel(&self, channel_id: &str) -> Result<()> {
+        self.client.view_channel(channel_id, None).await?;
+        Ok(())
+    }
+
+    async fn get_channel_unread(&self, channel_id: &str) -> Result<crate::types::ChannelUnread> {
+        let mm_unread = self.client.get_channel_unread(channel_id).await?;
+
+        Ok(crate::types::ChannelUnread {
+            channel_id: mm_unread.channel_id,
+            team_id: Some(mm_unread.team_id),
+            msg_count: mm_unread.msg_count,
+            mention_count: mm_unread.mention_count,
+            last_viewed_at: mm_unread.last_viewed_at,
+        })
+    }
+
+    async fn get_team_unreads(&self, team_id: &str) -> Result<Vec<crate::types::ChannelUnread>> {
+        let mm_unreads = self.client.get_team_unreads(team_id).await?;
+
+        Ok(mm_unreads
+            .into_iter()
+            .map(|mm_unread| crate::types::ChannelUnread {
+                channel_id: mm_unread.channel_id,
+                team_id: Some(mm_unread.team_id),
+                msg_count: mm_unread.msg_count,
+                mention_count: mm_unread.mention_count,
+                last_viewed_at: mm_unread.last_viewed_at,
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]

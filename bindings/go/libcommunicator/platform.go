@@ -810,6 +810,69 @@ func (p *Platform) RemoveChannelMember(channelID, userID string) error {
 	return nil
 }
 
+// ViewChannel marks a channel as viewed (read) by the current user
+func (p *Platform) ViewChannel(channelID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(channelID)
+	defer free()
+
+	code := C.communicator_platform_view_channel(p.handle, cs)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetChannelUnread gets unread message information for a specific channel
+func (p *Platform) GetChannelUnread(channelID string) (*ChannelUnread, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(channelID)
+	defer free()
+
+	cstr := C.communicator_platform_get_channel_unread(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var unread ChannelUnread
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &unread); err != nil {
+		return nil, err
+	}
+
+	return &unread, nil
+}
+
+// GetTeamUnreads gets unread counts for all channels in a specific team
+func (p *Platform) GetTeamUnreads(teamID string) ([]ChannelUnread, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cs, free := cStringFree(teamID)
+	defer free()
+
+	cstr := C.communicator_platform_get_team_unreads(p.handle, cs)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var unreads []ChannelUnread
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &unreads); err != nil {
+		return nil, err
+	}
+
+	return unreads, nil
+}
+
 // GetUserByUsername gets a user by username
 func (p *Platform) GetUserByUsername(username string) (*User, error) {
 	if p.handle == nil {

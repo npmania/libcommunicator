@@ -41,6 +41,15 @@ type Channel struct {
 	TeamID      string      `json:"team_id,omitempty"`
 }
 
+// ChannelUnread represents unread information for a channel
+type ChannelUnread struct {
+	ChannelID     string  `json:"channel_id"`
+	TeamID        *string `json:"team_id,omitempty"`
+	MsgCount      int64   `json:"msg_count"`
+	MentionCount  int64   `json:"mention_count"`
+	LastViewedAt  int64   `json:"last_viewed_at"` // Unix timestamp in milliseconds
+}
+
 // TeamType represents the type/visibility of a team
 type TeamType string
 

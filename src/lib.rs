@@ -13,8 +13,8 @@ pub use context::{Context, LogCallback, LogLevel};
 pub use error::{Error, ErrorCode, Result};
 pub use platforms::{Platform, PlatformConfig, PlatformEvent};
 pub use types::{
-    Attachment, Channel, ChannelType, ConnectionInfo, ConnectionState, Emoji, Message, Team,
-    TeamType, User,
+    Attachment, Channel, ChannelType, ChannelUnread, ConnectionInfo, ConnectionState, Emoji,
+    Message, Team, TeamType, User,
 };
 
 // Library version information
@@ -4439,6 +4439,170 @@ pub unsafe extern "C" fn communicator_platform_update_channel_notify_props(
             let code = e.code;
             error::set_last_error(e);
             code
+        }
+    }
+}
+
+// ============================================================================
+// Channel Read State Management FFI
+// ============================================================================
+
+/// FFI function: Mark a channel as viewed (read)
+/// Returns error code indicating success or failure
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_view_channel(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.view_channel(channel_id_str)) {
+        Ok(()) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get unread information for a channel
+/// Returns a JSON string with unread counts or NULL on error
+/// The returned string must be freed with communicator_free_string()
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_channel_unread(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    let unread_info = match runtime::block_on(platform.get_channel_unread(channel_id_str)) {
+        Ok(info) => info,
+        Err(e) => {
+            error::set_last_error(e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    // Serialize to JSON
+    let json = match serde_json::to_string(&unread_info) {
+        Ok(j) => j,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::Unknown,
+                format!("Failed to serialize unread info: {e}"),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    match CString::new(json) {
+        Ok(c_string) => c_string.into_raw(),
+        Err(_) => {
+            error::set_last_error(Error::invalid_utf8());
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get unread counts for all channels in a team
+/// Returns a JSON string with array of unread info or NULL on error
+/// The returned string must be freed with communicator_free_string()
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_get_team_unreads(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    let unreads = match runtime::block_on(platform.get_team_unreads(team_id_str)) {
+        Ok(list) => list,
+        Err(e) => {
+            error::set_last_error(e);
+            return std::ptr::null_mut();
+        }
+    };
+
+    // Serialize to JSON
+    let json = match serde_json::to_string(&unreads) {
+        Ok(j) => j,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::Unknown,
+                format!("Failed to serialize team unreads: {e}"),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    match CString::new(json) {
+        Ok(c_string) => c_string.into_raw(),
+        Err(_) => {
+            error::set_last_error(Error::invalid_utf8());
+            std::ptr::null_mut()
         }
     }
 }

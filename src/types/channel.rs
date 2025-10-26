@@ -118,6 +118,53 @@ impl Channel {
     }
 }
 
+/// Unread information for a channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelUnread {
+    /// Channel ID
+    pub channel_id: String,
+    /// Team/workspace ID (if applicable)
+    pub team_id: Option<String>,
+    /// Number of unread messages
+    pub msg_count: i64,
+    /// Number of unread mentions
+    pub mention_count: i64,
+    /// Timestamp when the channel was last viewed (milliseconds since epoch)
+    pub last_viewed_at: i64,
+}
+
+impl ChannelUnread {
+    /// Create a new ChannelUnread instance
+    pub fn new(channel_id: impl Into<String>) -> Self {
+        ChannelUnread {
+            channel_id: channel_id.into(),
+            team_id: None,
+            msg_count: 0,
+            mention_count: 0,
+            last_viewed_at: 0,
+        }
+    }
+
+    /// Set team ID
+    pub fn with_team(mut self, team_id: impl Into<String>) -> Self {
+        self.team_id = Some(team_id.into());
+        self
+    }
+
+    /// Set unread counts
+    pub fn with_counts(mut self, msg_count: i64, mention_count: i64) -> Self {
+        self.msg_count = msg_count;
+        self.mention_count = mention_count;
+        self
+    }
+
+    /// Set last viewed timestamp
+    pub fn with_last_viewed(mut self, last_viewed_at: i64) -> Self {
+        self.last_viewed_at = last_viewed_at;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
