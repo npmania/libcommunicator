@@ -25,20 +25,20 @@ type Version struct {
 type ErrorCode int
 
 const (
-	Success             ErrorCode = 0
-	ErrorUnknown        ErrorCode = 1
-	ErrorInvalidArg     ErrorCode = 2
-	ErrorNullPointer    ErrorCode = 3
-	ErrorOutOfMemory    ErrorCode = 4
-	ErrorInvalidUTF8    ErrorCode = 5
-	ErrorNetwork        ErrorCode = 6
-	ErrorAuthFailed     ErrorCode = 7
-	ErrorNotFound       ErrorCode = 8
-	ErrorPermDenied     ErrorCode = 9
-	ErrorTimeout        ErrorCode = 10
-	ErrorInvalidState   ErrorCode = 11
-	ErrorUnsupported    ErrorCode = 12
-	ErrorRateLimited    ErrorCode = 13
+	Success           ErrorCode = 0
+	ErrorUnknown      ErrorCode = 1
+	ErrorInvalidArg   ErrorCode = 2
+	ErrorNullPointer  ErrorCode = 3
+	ErrorOutOfMemory  ErrorCode = 4
+	ErrorInvalidUTF8  ErrorCode = 5
+	ErrorNetwork      ErrorCode = 6
+	ErrorAuthFailed   ErrorCode = 7
+	ErrorNotFound     ErrorCode = 8
+	ErrorPermDenied   ErrorCode = 9
+	ErrorTimeout      ErrorCode = 10
+	ErrorInvalidState ErrorCode = 11
+	ErrorUnsupported  ErrorCode = 12
+	ErrorRateLimited  ErrorCode = 13
 )
 
 var initialized bool

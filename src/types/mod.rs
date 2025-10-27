@@ -16,5 +16,5 @@ pub use channel::{Channel, ChannelType, ChannelUnread};
 pub use connection::{ConnectionInfo, ConnectionState};
 pub use emoji::Emoji;
 pub use message::{Attachment, Message};
-pub use team::{Team, TeamType};
+pub use team::{Team, TeamType, TeamUnread};
 pub use user::User;

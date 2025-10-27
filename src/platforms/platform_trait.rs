@@ -866,6 +866,45 @@ pub trait Platform: Send + Sync {
         ))
     }
 
+    /// Get file preview (full-size image preview)
+    ///
+    /// Downloads a full-size preview of a file, typically for images.
+    ///
+    /// # Arguments
+    /// * `file_id` - The ID of the file to get preview for
+    ///
+    /// # Returns
+    /// The file preview data as bytes
+    ///
+    /// # Notes
+    /// Not all platforms support file previews.
+    async fn get_file_preview(&self, file_id: &str) -> Result<Vec<u8>> {
+        let _ = file_id;
+        Err(crate::error::Error::unsupported(
+            "File previews not supported by this platform",
+        ))
+    }
+
+    /// Get a public link to a file
+    ///
+    /// Generates a public URL for accessing a file.
+    ///
+    /// # Arguments
+    /// * `file_id` - The ID of the file
+    ///
+    /// # Returns
+    /// A public URL string for the file
+    ///
+    /// # Notes
+    /// Not all platforms support public file links.
+    /// The link may be temporary or permanent depending on the platform.
+    async fn get_file_link(&self, file_id: &str) -> Result<String> {
+        let _ = file_id;
+        Err(crate::error::Error::unsupported(
+            "File links not supported by this platform",
+        ))
+    }
+
     // ========================================================================
     // Thread Operations
     // ========================================================================
@@ -967,6 +1006,86 @@ pub trait Platform: Send + Sync {
         let _ = (thread_id, post_id);
         Err(crate::error::Error::unsupported(
             "Thread read status not supported by this platform",
+        ))
+    }
+
+    /// Get all threads for a user in a team
+    ///
+    /// Retrieves a list of all threads the user participates in or follows.
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    /// * `team_id` - The team ID
+    /// * `since` - Timestamp to get threads since (Unix milliseconds, 0 for all)
+    /// * `deleted` - Whether to include deleted threads
+    /// * `unread` - Whether to filter for unread only
+    /// * `per_page` - Number of threads per page
+    /// * `page` - Page number (0-indexed)
+    ///
+    /// # Returns
+    /// JSON string containing thread list
+    ///
+    /// # Notes
+    /// Returns platform-specific JSON. Not all platforms support thread listing.
+    async fn get_user_threads(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        since: u64,
+        deleted: bool,
+        unread: bool,
+        per_page: usize,
+        page: usize,
+    ) -> Result<String> {
+        let _ = (user_id, team_id, since, deleted, unread, per_page, page);
+        Err(crate::error::Error::unsupported(
+            "Thread listing not supported by this platform",
+        ))
+    }
+
+    /// Get a specific thread for a user
+    ///
+    /// Retrieves detailed information about a specific thread for a user.
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    /// * `team_id` - The team ID
+    /// * `thread_id` - The thread ID (root post ID)
+    ///
+    /// # Returns
+    /// JSON string containing thread information
+    ///
+    /// # Notes
+    /// Returns platform-specific JSON. Not all platforms support per-user thread info.
+    async fn get_user_thread(
+        &self,
+        user_id: &str,
+        team_id: &str,
+        thread_id: &str,
+    ) -> Result<String> {
+        let _ = (user_id, team_id, thread_id);
+        Err(crate::error::Error::unsupported(
+            "Thread information not supported by this platform",
+        ))
+    }
+
+    /// Mark all threads as read for a user in a team
+    ///
+    /// Bulk operation to mark all threads as read.
+    ///
+    /// # Arguments
+    /// * `user_id` - The user ID
+    /// * `team_id` - The team ID
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Notes
+    /// Not all platforms support bulk thread marking.
+    async fn mark_all_threads_as_read(&self, user_id: &str, team_id: &str) -> Result<()> {
+        let _ = (user_id, team_id);
+        Err(crate::error::Error::unsupported(
+            "Bulk thread marking not supported by this platform",
         ))
     }
 
@@ -1221,6 +1340,48 @@ pub trait Platform: Send + Sync {
         let _ = team_id;
         Err(crate::error::Error::unsupported(
             "Team unread tracking not supported by this platform",
+        ))
+    }
+
+    /// Get unread counts for all channels across all teams
+    ///
+    /// Returns comprehensive unread information for the authenticated user.
+    ///
+    /// # Returns
+    /// Vector of TeamUnread objects containing unread information across all teams
+    ///
+    /// # Notes
+    /// Not all platforms support cross-team unread tracking.
+    async fn get_all_unreads(&self) -> Result<Vec<crate::types::TeamUnread>> {
+        Err(crate::error::Error::unsupported(
+            "All unreads tracking not supported by this platform",
+        ))
+    }
+
+    /// Get unread posts in a channel
+    ///
+    /// Retrieves the actual unread messages in a channel.
+    ///
+    /// # Arguments
+    /// * `channel_id` - The channel ID
+    /// * `limit_after` - Maximum number of posts to retrieve after last read (newer posts)
+    /// * `limit_before` - Maximum number of posts to retrieve before last read (context)
+    ///
+    /// # Returns
+    /// Platform-specific JSON containing unread posts
+    ///
+    /// # Notes
+    /// Not all platforms support fetching unread posts directly.
+    /// The returned format is platform-specific.
+    async fn get_unread_posts(
+        &self,
+        channel_id: &str,
+        limit_after: usize,
+        limit_before: usize,
+    ) -> Result<String> {
+        let _ = (channel_id, limit_after, limit_before);
+        Err(crate::error::Error::unsupported(
+            "Unread posts tracking not supported by this platform",
         ))
     }
 }

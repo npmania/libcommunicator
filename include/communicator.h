@@ -576,6 +576,131 @@ char* communicator_platform_search_messages(
     uint32_t limit
 );
 
+// ============================================================================
+// Advanced Search Operations
+// ============================================================================
+
+/**
+ * Search for users with advanced filtering
+ *
+ * @param platform The platform handle
+ * @param request_json JSON string with search parameters:
+ *                     {
+ *                       "term": "search query",
+ *                       "team_id": "optional-team-id",
+ *                       "not_in_team_id": "optional-team-id",
+ *                       "in_channel_id": "optional-channel-id",
+ *                       "not_in_channel_id": "optional-channel-id",
+ *                       "allow_inactive": false,
+ *                       "limit": 100
+ *                     }
+ * @return A JSON array string of User objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_search_users(
+    CommunicatorPlatform platform,
+    const char* request_json
+);
+
+/**
+ * Autocomplete users for mentions
+ *
+ * @param platform The platform handle
+ * @param name Partial username to autocomplete
+ * @param team_id The team ID to search within (pass NULL for all teams)
+ * @param channel_id The channel ID to scope autocomplete (pass NULL for team-wide)
+ * @param limit Maximum number of results to return
+ * @return A JSON array string of User objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_autocomplete_users(
+    CommunicatorPlatform platform,
+    const char* name,
+    const char* team_id,
+    const char* channel_id,
+    uint32_t limit
+);
+
+/**
+ * Search for channels
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID to search within
+ * @param term Search query
+ * @return A JSON array string of Channel objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_search_channels(
+    CommunicatorPlatform platform,
+    const char* team_id,
+    const char* term
+);
+
+/**
+ * Autocomplete channels for references
+ *
+ * @param platform The platform handle
+ * @param team_id The team ID to search within
+ * @param name Partial channel name to autocomplete
+ * @return A JSON array string of Channel objects
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_autocomplete_channels(
+    CommunicatorPlatform platform,
+    const char* team_id,
+    const char* name
+);
+
+/**
+ * Search for files with advanced filtering
+ *
+ * @param platform The platform handle
+ * @param request_json JSON string with search parameters:
+ *                     {
+ *                       "terms": "search query",
+ *                       "is_or_search": false,
+ *                       "time_zone_offset": 0,
+ *                       "include_deleted_channels": false,
+ *                       "page": 0,
+ *                       "per_page": 60,
+ *                       "extensions": ["pdf", "jpg"],
+ *                       "exclude_extensions": ["exe"]
+ *                     }
+ * @return A JSON string with file search results
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_search_files(
+    CommunicatorPlatform platform,
+    const char* request_json
+);
+
+/**
+ * Search for posts with advanced filtering
+ *
+ * @param platform The platform handle
+ * @param request_json JSON string with search parameters:
+ *                     {
+ *                       "terms": "search query",
+ *                       "is_or_search": false,
+ *                       "time_zone_offset": 0,
+ *                       "include_deleted_channels": false,
+ *                       "page": 0,
+ *                       "per_page": 60
+ *                     }
+ * @return A JSON string with post search results
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_search_posts_advanced(
+    CommunicatorPlatform platform,
+    const char* request_json
+);
+
 /**
  * Get messages before a specific message (pagination)
  *
@@ -1076,6 +1201,40 @@ CommunicatorErrorCode communicator_platform_get_file_thumbnail(
  */
 void communicator_free_file_data(uint8_t* data, size_t size);
 
+/**
+ * Get file preview (full-size image preview)
+ *
+ * Downloads a full-size preview of a file, typically for images.
+ *
+ * @param platform The platform handle
+ * @param file_id The ID of the file
+ * @param out_data Output parameter for the preview data (caller must free with communicator_free_file_data())
+ * @param out_size Output parameter for the size of the preview data in bytes
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_get_file_preview(
+    CommunicatorPlatform platform,
+    const char* file_id,
+    uint8_t** out_data,
+    size_t* out_size
+);
+
+/**
+ * Get a public link to a file
+ *
+ * Generates a public URL for accessing a file.
+ *
+ * @param platform The platform handle
+ * @param file_id The ID of the file
+ * @return A dynamically allocated string containing the file URL
+ *         (caller must free with communicator_free_string())
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_file_link(
+    CommunicatorPlatform platform,
+    const char* file_id
+);
+
 // ============================================================================
 // Thread Operations
 // ============================================================================
@@ -1151,6 +1310,70 @@ CommunicatorErrorCode communicator_platform_mark_thread_unread(
     CommunicatorPlatform platform,
     const char* thread_id,
     const char* post_id
+);
+
+/**
+ * Get all threads for a user in a team
+ *
+ * Retrieves a list of all threads the user participates in or follows.
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @param team_id The team ID
+ * @param since Timestamp to get threads since (Unix milliseconds, 0 for all)
+ * @param deleted Whether to include deleted threads (0 = no, 1 = yes)
+ * @param unread Whether to filter for unread only (0 = all, 1 = unread only)
+ * @param per_page Number of threads per page
+ * @param page Page number (0-indexed)
+ * @return A JSON string containing thread list
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user_threads(
+    CommunicatorPlatform platform,
+    const char* user_id,
+    const char* team_id,
+    uint64_t since,
+    int deleted,
+    int unread,
+    uint32_t per_page,
+    uint32_t page
+);
+
+/**
+ * Get a specific thread for a user
+ *
+ * Retrieves detailed information about a specific thread for a user.
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @param team_id The team ID
+ * @param thread_id The thread ID (root post ID)
+ * @return A JSON string containing thread information
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_user_thread(
+    CommunicatorPlatform platform,
+    const char* user_id,
+    const char* team_id,
+    const char* thread_id
+);
+
+/**
+ * Mark all threads as read for a user in a team
+ *
+ * Bulk operation to mark all threads as read.
+ *
+ * @param platform The platform handle
+ * @param user_id The user ID
+ * @param team_id The team ID
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_mark_all_threads_read(
+    CommunicatorPlatform platform,
+    const char* user_id,
+    const char* team_id
 );
 
 // ============================================================================
@@ -1276,6 +1499,40 @@ char* communicator_platform_get_channel_unread(
 char* communicator_platform_get_team_unreads(
     CommunicatorPlatform platform,
     const char* team_id
+);
+
+/**
+ * Get unread counts for all channels across all teams
+ *
+ * Returns comprehensive unread information for the authenticated user.
+ *
+ * @param platform The platform handle
+ * @return A JSON string with array of TeamUnread objects containing unread info
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_all_unreads(
+    CommunicatorPlatform platform
+);
+
+/**
+ * Get unread posts in a channel
+ *
+ * Retrieves the actual unread messages in a channel.
+ *
+ * @param platform The platform handle
+ * @param channel_id The channel ID
+ * @param limit_after Maximum number of posts to retrieve after last read (newer posts)
+ * @param limit_before Maximum number of posts to retrieve before last read (context)
+ * @return A JSON string containing post list
+ *         Must be freed with communicator_free_string()
+ *         Returns NULL on error
+ */
+char* communicator_platform_get_unread_posts(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    uint32_t limit_after,
+    uint32_t limit_before
 );
 
 // ============================================================================

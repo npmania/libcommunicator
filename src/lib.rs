@@ -3724,6 +3724,100 @@ pub unsafe extern "C" fn communicator_free_file_data(data: *mut u8, size: usize)
     }
 }
 
+/// FFI function: Get file preview (full-size image preview)
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_file_preview(
+    handle: PlatformHandle,
+    file_id: *const c_char,
+    out_data: *mut *mut u8,
+    out_size: *mut usize,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || file_id.is_null() || out_data.is_null() || out_size.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let file_id_str = {
+        match std::ffi::CStr::from_ptr(file_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_file_preview(file_id_str)) {
+        Ok(data) => {
+            let size = data.len();
+            let boxed_data = data.into_boxed_slice();
+            let raw_ptr = Box::into_raw(boxed_data) as *mut u8;
+
+            *out_data = raw_ptr;
+            *out_size = size;
+            ErrorCode::Success
+        }
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
+/// FFI function: Get a public link to a file
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_file_link(
+    handle: PlatformHandle,
+    file_id: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || file_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let file_id_str = {
+        match std::ffi::CStr::from_ptr(file_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_file_link(file_id_str)) {
+        Ok(link) => match CString::new(link) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    "Failed to convert result to C string",
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
 // ============================================================================
 // Thread Operations
 // ============================================================================
@@ -3957,35 +4051,40 @@ pub unsafe extern "C" fn communicator_platform_mark_thread_unread(
     }
 }
 
-// ============================================================================
-// Search Operations
-// ============================================================================
-
-/// FFI function: Search for users
-///
-/// # Arguments
-/// * `handle` - Platform handle
-/// * `query` - Search query string
-/// * `limit` - Maximum number of results
-///
-/// # Returns
-/// JSON array of users on success, or null on error
+/// FFI function: Get all threads for a user in a team
 ///
 /// # Safety
 /// The caller must ensure all pointer arguments are valid.
 #[no_mangle]
-pub unsafe extern "C" fn communicator_platform_search_users(
+pub unsafe extern "C" fn communicator_platform_get_user_threads(
     handle: PlatformHandle,
-    query: *const c_char,
-    limit: usize,
+    user_id: *const c_char,
+    team_id: *const c_char,
+    since: u64,
+    deleted: std::os::raw::c_int,
+    unread: std::os::raw::c_int,
+    per_page: usize,
+    page: usize,
 ) -> *mut c_char {
-    if handle.is_null() || query.is_null() {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() || team_id.is_null() {
         error::set_last_error(Error::null_pointer());
         return std::ptr::null_mut();
     }
 
-    let query_str = {
-        match std::ffi::CStr::from_ptr(query).to_str() {
+    let user_id_str = {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
             Ok(s) => s,
             Err(_) => {
                 error::set_last_error(Error::invalid_utf8());
@@ -3996,22 +4095,21 @@ pub unsafe extern "C" fn communicator_platform_search_users(
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.search_users(query_str, limit)) {
-        Ok(users) => match serde_json::to_string(&users) {
-            Ok(json) => match std::ffi::CString::new(json) {
-                Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    error::set_last_error(Error::new(
-                        ErrorCode::Unknown,
-                        "Failed to convert result to C string",
-                    ));
-                    std::ptr::null_mut()
-                }
-            },
-            Err(e) => {
+    match runtime::block_on(platform.get_user_threads(
+        user_id_str,
+        team_id_str,
+        since,
+        deleted != 0,
+        unread != 0,
+        per_page,
+        page,
+    )) {
+        Ok(json) => match CString::new(json) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize users: {}", e),
+                    "Failed to convert result to C string",
                 ));
                 std::ptr::null_mut()
             }
@@ -4023,33 +4121,26 @@ pub unsafe extern "C" fn communicator_platform_search_users(
     }
 }
 
-/// FFI function: Autocomplete users for mentions
-///
-/// # Arguments
-/// * `handle` - Platform handle
-/// * `channel_id` - Channel ID to search within
-/// * `query` - Username prefix to autocomplete
-/// * `limit` - Maximum number of results
-///
-/// # Returns
-/// JSON array of users on success, or null on error
+/// FFI function: Get a specific thread for a user
 ///
 /// # Safety
 /// The caller must ensure all pointer arguments are valid.
 #[no_mangle]
-pub unsafe extern "C" fn communicator_platform_autocomplete_users(
+pub unsafe extern "C" fn communicator_platform_get_user_thread(
     handle: PlatformHandle,
-    channel_id: *const c_char,
-    query: *const c_char,
-    limit: usize,
+    user_id: *const c_char,
+    team_id: *const c_char,
+    thread_id: *const c_char,
 ) -> *mut c_char {
-    if handle.is_null() || channel_id.is_null() || query.is_null() {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() || team_id.is_null() || thread_id.is_null() {
         error::set_last_error(Error::null_pointer());
         return std::ptr::null_mut();
     }
 
-    let channel_id_str = {
-        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+    let user_id_str = {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
                 error::set_last_error(Error::invalid_utf8());
@@ -4058,8 +4149,18 @@ pub unsafe extern "C" fn communicator_platform_autocomplete_users(
         }
     };
 
-    let query_str = {
-        match std::ffi::CStr::from_ptr(query).to_str() {
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let thread_id_str = {
+        match std::ffi::CStr::from_ptr(thread_id).to_str() {
             Ok(s) => s,
             Err(_) => {
                 error::set_last_error(Error::invalid_utf8());
@@ -4070,22 +4171,13 @@ pub unsafe extern "C" fn communicator_platform_autocomplete_users(
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.autocomplete_users(channel_id_str, query_str, limit)) {
-        Ok(users) => match serde_json::to_string(&users) {
-            Ok(json) => match std::ffi::CString::new(json) {
-                Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    error::set_last_error(Error::new(
-                        ErrorCode::Unknown,
-                        "Failed to convert result to C string",
-                    ));
-                    std::ptr::null_mut()
-                }
-            },
-            Err(e) => {
+    match runtime::block_on(platform.get_user_thread(user_id_str, team_id_str, thread_id_str)) {
+        Ok(json) => match CString::new(json) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
                 error::set_last_error(Error::new(
                     ErrorCode::Unknown,
-                    &format!("Failed to serialize users: {}", e),
+                    "Failed to convert result to C string",
                 ));
                 std::ptr::null_mut()
             }
@@ -4097,126 +4189,51 @@ pub unsafe extern "C" fn communicator_platform_autocomplete_users(
     }
 }
 
-/// FFI function: Search for channels
-///
-/// # Arguments
-/// * `handle` - Platform handle
-/// * `query` - Search query string
-/// * `limit` - Maximum number of results
-///
-/// # Returns
-/// JSON array of channels on success, or null on error
+/// FFI function: Mark all threads as read for a user in a team
 ///
 /// # Safety
 /// The caller must ensure all pointer arguments are valid.
 #[no_mangle]
-pub unsafe extern "C" fn communicator_platform_search_channels(
+pub unsafe extern "C" fn communicator_platform_mark_all_threads_read(
     handle: PlatformHandle,
-    query: *const c_char,
-    limit: usize,
-) -> *mut c_char {
-    if handle.is_null() || query.is_null() {
+    user_id: *const c_char,
+    team_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || user_id.is_null() || team_id.is_null() {
         error::set_last_error(Error::null_pointer());
-        return std::ptr::null_mut();
+        return ErrorCode::NullPointer;
     }
 
-    let query_str = {
-        match std::ffi::CStr::from_ptr(query).to_str() {
+    let user_id_str = {
+        match std::ffi::CStr::from_ptr(user_id).to_str() {
             Ok(s) => s,
             Err(_) => {
                 error::set_last_error(Error::invalid_utf8());
-                return std::ptr::null_mut();
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
             }
         }
     };
 
     let platform = &**handle;
 
-    match runtime::block_on(platform.search_channels(query_str, limit)) {
-        Ok(channels) => match serde_json::to_string(&channels) {
-            Ok(json) => match std::ffi::CString::new(json) {
-                Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    error::set_last_error(Error::new(
-                        ErrorCode::Unknown,
-                        "Failed to convert result to C string",
-                    ));
-                    std::ptr::null_mut()
-                }
-            },
-            Err(e) => {
-                error::set_last_error(Error::new(
-                    ErrorCode::Unknown,
-                    &format!("Failed to serialize channels: {}", e),
-                ));
-                std::ptr::null_mut()
-            }
-        },
+    match runtime::block_on(platform.mark_all_threads_as_read(user_id_str, team_id_str)) {
+        Ok(()) => ErrorCode::Success,
         Err(e) => {
+            let code = e.code;
             error::set_last_error(e);
-            std::ptr::null_mut()
-        }
-    }
-}
-
-/// FFI function: Autocomplete channels for references
-///
-/// # Arguments
-/// * `handle` - Platform handle
-/// * `query` - Channel name prefix to autocomplete
-/// * `limit` - Maximum number of results
-///
-/// # Returns
-/// JSON array of channels on success, or null on error
-///
-/// # Safety
-/// The caller must ensure all pointer arguments are valid.
-#[no_mangle]
-pub unsafe extern "C" fn communicator_platform_autocomplete_channels(
-    handle: PlatformHandle,
-    query: *const c_char,
-    limit: usize,
-) -> *mut c_char {
-    if handle.is_null() || query.is_null() {
-        error::set_last_error(Error::null_pointer());
-        return std::ptr::null_mut();
-    }
-
-    let query_str = {
-        match std::ffi::CStr::from_ptr(query).to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                error::set_last_error(Error::invalid_utf8());
-                return std::ptr::null_mut();
-            }
-        }
-    };
-
-    let platform = &**handle;
-
-    match runtime::block_on(platform.autocomplete_channels(query_str, limit)) {
-        Ok(channels) => match serde_json::to_string(&channels) {
-            Ok(json) => match std::ffi::CString::new(json) {
-                Ok(c_string) => c_string.into_raw(),
-                Err(_) => {
-                    error::set_last_error(Error::new(
-                        ErrorCode::Unknown,
-                        "Failed to convert result to C string",
-                    ));
-                    std::ptr::null_mut()
-                }
-            },
-            Err(e) => {
-                error::set_last_error(Error::new(
-                    ErrorCode::Unknown,
-                    &format!("Failed to serialize channels: {}", e),
-                ));
-                std::ptr::null_mut()
-            }
-        },
-        Err(e) => {
-            error::set_last_error(e);
-            std::ptr::null_mut()
+            code
         }
     }
 }
@@ -4281,6 +4298,404 @@ pub unsafe extern "C" fn communicator_platform_search_messages(
             std::ptr::null_mut()
         }
     }
+}
+
+// ============================================================================
+// Advanced Search Operations
+// ============================================================================
+
+/// FFI function: Search for users with advanced filtering
+///
+/// # Arguments
+/// * `handle` - Platform handle
+/// * `request_json` - JSON string with UserSearchRequest parameters
+///
+/// # Returns
+/// JSON array of users on success, or null on error
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_search_users(
+    handle: PlatformHandle,
+    request_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || request_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let request_str = {
+        match std::ffi::CStr::from_ptr(request_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let request: platforms::mattermost::UserSearchRequest = match serde_json::from_str(request_str) {
+        Ok(r) => r,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Failed to parse search request: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let platform = &**handle;
+
+    // Extract term and limit for the simple trait method
+    let query = &request.term;
+    let limit = request.limit.unwrap_or(100) as usize;
+
+    match runtime::block_on(platform.search_users(query, limit)) {
+        Ok(users) => match serde_json::to_string(&users) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert result to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize users: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Autocomplete users for mentions
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_autocomplete_users(
+    handle: PlatformHandle,
+    name: *const c_char,
+    team_id: *const c_char,
+    channel_id: *const c_char,
+    limit: usize,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let name_str = {
+        match std::ffi::CStr::from_ptr(name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let _team_id_opt = if team_id.is_null() {
+        None
+    } else {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let channel_id_str = if channel_id.is_null() {
+        ""
+    } else {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    // Note: team_id is not used by the simple trait method
+    // For full advanced search support, the platform trait would need enhancement
+    match runtime::block_on(platform.autocomplete_users(channel_id_str, name_str, limit)) {
+        Ok(users) => match serde_json::to_string(&users) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert result to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize users: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Search for channels
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_search_channels(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+    term: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() || term.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let term_str = {
+        match std::ffi::CStr::from_ptr(term).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    // Note: team_id is not used by the simple trait method
+    // For full advanced search support, the platform trait would need enhancement
+    let _ = team_id_str; // Unused in simple trait method
+    match runtime::block_on(platform.search_channels(term_str, 100)) {
+        Ok(channels) => match serde_json::to_string(&channels) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert result to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize channels: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Autocomplete channels for references
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_autocomplete_channels(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+    name: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() || name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let name_str = {
+        match std::ffi::CStr::from_ptr(name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    // Note: team_id is not used by the simple trait method
+    // For full advanced search support, the platform trait would need enhancement
+    let _ = team_id_str; // Unused in simple trait method
+    match runtime::block_on(platform.autocomplete_channels(name_str, 100)) {
+        Ok(channels) => match serde_json::to_string(&channels) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert result to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize channels: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Search for files with advanced filtering
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_search_files(
+    handle: PlatformHandle,
+    request_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || request_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let request_str = {
+        match std::ffi::CStr::from_ptr(request_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let _request: platforms::mattermost::FileSearchRequest = match serde_json::from_str(request_str) {
+        Ok(r) => r,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Failed to parse file search request: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let _platform = &**handle;
+
+    // TODO: File search requires Platform trait support - not yet implemented
+    // The Platform trait needs a search_files method added
+    error::set_last_error(Error::unsupported(
+        "Advanced file search not yet supported by Platform trait"
+    ));
+    std::ptr::null_mut()
+}
+
+/// FFI function: Search for posts with advanced filtering
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_search_posts_advanced(
+    handle: PlatformHandle,
+    request_json: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || request_json.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let request_str = {
+        match std::ffi::CStr::from_ptr(request_json).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let _request: platforms::mattermost::PostSearchOptions = match serde_json::from_str(request_str) {
+        Ok(r) => r,
+        Err(e) => {
+            error::set_last_error(Error::new(
+                ErrorCode::InvalidArgument,
+                &format!("Failed to parse post search request: {}", e),
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+
+    let _platform = &**handle;
+
+    // TODO: Advanced post search requires Platform trait support - not yet implemented
+    // The Platform trait has search_messages(query, limit) but not advanced options
+    // To support this properly, need to add search_posts_advanced to the trait
+    error::set_last_error(Error::unsupported(
+        "Advanced post search not yet supported by Platform trait"
+    ));
+    std::ptr::null_mut()
 }
 
 // ============================================================================
@@ -4680,6 +5095,98 @@ pub unsafe extern "C" fn communicator_platform_get_team_unreads(
         Ok(c_string) => c_string.into_raw(),
         Err(_) => {
             error::set_last_error(Error::invalid_utf8());
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get unread counts for all channels across all teams
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_all_unreads(
+    handle: PlatformHandle,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_all_unreads()) {
+        Ok(unreads) => match serde_json::to_string(&unreads) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::Unknown,
+                        "Failed to convert result to C string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    &format!("Failed to serialize unreads: {}", e),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Get unread posts in a channel
+///
+/// # Safety
+/// The caller must ensure all pointer arguments are valid.
+#[no_mangle]
+pub unsafe extern "C" fn communicator_platform_get_unread_posts(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    limit_after: usize,
+    limit_before: usize,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.get_unread_posts(channel_id_str, limit_after, limit_before)) {
+        Ok(json) => match CString::new(json) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    "Failed to convert result to C string",
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
             std::ptr::null_mut()
         }
     }

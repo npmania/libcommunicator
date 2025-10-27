@@ -9,7 +9,7 @@ use super::types::{MattermostChannel, MattermostUser, PostList};
 // ============================================================================
 
 /// Request body for user search
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSearchRequest {
     /// Search term to match against username, first name, last name, nickname, or email
     pub term: String,
@@ -99,7 +99,7 @@ impl ChannelSearchRequest {
 }
 
 /// Request body for file search
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileSearchRequest {
     /// Search terms
     pub terms: String,
@@ -174,7 +174,7 @@ pub struct FileSearchResponse {
 }
 
 /// Advanced search options for posts
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PostSearchOptions {
     /// Search is case-insensitive
     pub is_or_search: bool,

@@ -43,11 +43,18 @@ type Channel struct {
 
 // ChannelUnread represents unread information for a channel
 type ChannelUnread struct {
-	ChannelID     string  `json:"channel_id"`
-	TeamID        *string `json:"team_id,omitempty"`
-	MsgCount      int64   `json:"msg_count"`
-	MentionCount  int64   `json:"mention_count"`
-	LastViewedAt  int64   `json:"last_viewed_at"` // Unix timestamp in milliseconds
+	ChannelID    string  `json:"channel_id"`
+	TeamID       *string `json:"team_id,omitempty"`
+	MsgCount     int64   `json:"msg_count"`
+	MentionCount int64   `json:"mention_count"`
+	LastViewedAt int64   `json:"last_viewed_at"` // Unix timestamp in milliseconds
+}
+
+// TeamUnread represents unread counts for a team
+type TeamUnread struct {
+	TeamID       string `json:"team_id"`
+	MsgCount     int64  `json:"msg_count"`
+	MentionCount int64  `json:"mention_count"`
 }
 
 // TeamType represents the type/visibility of a team

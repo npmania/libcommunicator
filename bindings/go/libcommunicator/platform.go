@@ -68,15 +68,16 @@ func (p *Platform) Connect(config *PlatformConfig) error {
 // The config should include mfa_token in the Credentials map.
 //
 // Example:
-//   config := &libcommunicator.PlatformConfig{
-//       Server: "https://mattermost.example.com",
-//       Credentials: map[string]string{
-//           "login_id":  "user@example.com",
-//           "password":  "password123",
-//           "mfa_token": "123456",  // 6-digit MFA code
-//       },
-//   }
-//   err := platform.ConnectWithMFA(config)
+//
+//	config := &libcommunicator.PlatformConfig{
+//	    Server: "https://mattermost.example.com",
+//	    Credentials: map[string]string{
+//	        "login_id":  "user@example.com",
+//	        "password":  "password123",
+//	        "mfa_token": "123456",  // 6-digit MFA code
+//	    },
+//	}
+//	err := platform.ConnectWithMFA(config)
 func (p *Platform) ConnectWithMFA(config *PlatformConfig) error {
 	if p.handle == nil {
 		return ErrInvalidHandle
@@ -874,6 +875,53 @@ func (p *Platform) GetTeamUnreads(teamID string) ([]ChannelUnread, error) {
 	return unreads, nil
 }
 
+// GetAllUnreads gets unread counts for all channels across all teams
+// Returns a slice of TeamUnread containing aggregate unread information
+func (p *Platform) GetAllUnreads() ([]TeamUnread, error) {
+	if p.handle == nil {
+		return nil, ErrInvalidHandle
+	}
+
+	cstr := C.communicator_platform_get_all_unreads(p.handle)
+	if cstr == nil {
+		return nil, getLastError()
+	}
+	defer freeString(cstr)
+
+	var unreads []TeamUnread
+	if err := json.Unmarshal([]byte(C.GoString(cstr)), &unreads); err != nil {
+		return nil, err
+	}
+
+	return unreads, nil
+}
+
+// GetUnreadPosts gets the actual unread messages in a channel
+// limitAfter: maximum number of posts to retrieve after last read (newer posts)
+// limitBefore: maximum number of posts to retrieve before last read (context)
+// Returns a JSON string containing the post list
+func (p *Platform) GetUnreadPosts(channelID string, limitAfter, limitBefore uint32) (string, error) {
+	if p.handle == nil {
+		return "", ErrInvalidHandle
+	}
+
+	csChannelID, freeChannelID := cStringFree(channelID)
+	defer freeChannelID()
+
+	result := C.communicator_platform_get_unread_posts(
+		p.handle,
+		csChannelID,
+		C.uint32_t(limitAfter),
+		C.uint32_t(limitBefore),
+	)
+	if result == nil {
+		return "", getLastError()
+	}
+	defer C.communicator_free_string(result)
+
+	return C.GoString(result), nil
+}
+
 // GetUserByUsername gets a user by username
 func (p *Platform) GetUserByUsername(username string) (*User, error) {
 	if p.handle == nil {
@@ -1275,6 +1323,92 @@ func (p *Platform) MarkThreadUnread(threadID, postID string) error {
 	defer freePostID()
 
 	result := C.communicator_platform_mark_thread_unread(p.handle, csThreadID, csPostID)
+	if result != C.COMMUNICATOR_SUCCESS {
+		return getLastError()
+	}
+
+	return nil
+}
+
+// GetUserThreads retrieves all threads for a user with filtering options
+// Returns a JSON string containing thread information
+func (p *Platform) GetUserThreads(userID, teamID string, since uint64, deleted, unread bool, perPage, page uint32) (string, error) {
+	if p.handle == nil {
+		return "", ErrInvalidHandle
+	}
+
+	csUserID, freeUserID := cStringFree(userID)
+	defer freeUserID()
+
+	csTeamID, freeTeamID := cStringFree(teamID)
+	defer freeTeamID()
+
+	var deletedInt C.int
+	if deleted {
+		deletedInt = 1
+	}
+
+	var unreadInt C.int
+	if unread {
+		unreadInt = 1
+	}
+
+	result := C.communicator_platform_get_user_threads(
+		p.handle,
+		csUserID,
+		csTeamID,
+		C.uint64_t(since),
+		deletedInt,
+		unreadInt,
+		C.uint32_t(perPage),
+		C.uint32_t(page),
+	)
+	if result == nil {
+		return "", getLastError()
+	}
+	defer C.communicator_free_string(result)
+
+	return C.GoString(result), nil
+}
+
+// GetUserThread retrieves detailed information about a specific thread for a user
+// Returns a JSON string containing thread details
+func (p *Platform) GetUserThread(userID, teamID, threadID string) (string, error) {
+	if p.handle == nil {
+		return "", ErrInvalidHandle
+	}
+
+	csUserID, freeUserID := cStringFree(userID)
+	defer freeUserID()
+
+	csTeamID, freeTeamID := cStringFree(teamID)
+	defer freeTeamID()
+
+	csThreadID, freeThreadID := cStringFree(threadID)
+	defer freeThreadID()
+
+	result := C.communicator_platform_get_user_thread(p.handle, csUserID, csTeamID, csThreadID)
+	if result == nil {
+		return "", getLastError()
+	}
+	defer C.communicator_free_string(result)
+
+	return C.GoString(result), nil
+}
+
+// MarkAllThreadsRead marks all threads as read for a user in a team
+func (p *Platform) MarkAllThreadsRead(userID, teamID string) error {
+	if p.handle == nil {
+		return ErrInvalidHandle
+	}
+
+	csUserID, freeUserID := cStringFree(userID)
+	defer freeUserID()
+
+	csTeamID, freeTeamID := cStringFree(teamID)
+	defer freeTeamID()
+
+	result := C.communicator_platform_mark_all_threads_read(p.handle, csUserID, csTeamID)
 	if result != C.COMMUNICATOR_SUCCESS {
 		return getLastError()
 	}

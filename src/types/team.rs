@@ -47,6 +47,20 @@ pub enum TeamType {
     Invite,
 }
 
+/// Unread counts for a team
+///
+/// Represents the total number of unread messages and mentions across
+/// all channels in a team/workspace.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamUnread {
+    /// Team ID
+    pub team_id: String,
+    /// Total unread message count across all channels in team
+    pub msg_count: i64,
+    /// Total unread mention count across all channels in team
+    pub mention_count: i64,
+}
+
 impl Team {
     /// Create a new team
     pub fn new(

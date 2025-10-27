@@ -101,6 +101,46 @@ func (p *Platform) GetFileThumbnail(fileID string) ([]byte, error) {
 	return goData, nil
 }
 
+// GetFilePreview downloads a full-size file preview by its ID
+// This is similar to DownloadFile but may return an optimized preview version
+// Returns the preview image/file as bytes
+func (p *Platform) GetFilePreview(fileID string) ([]byte, error) {
+	cFileID := C.CString(fileID)
+	defer C.free(unsafe.Pointer(cFileID))
+
+	var data *C.uint8_t
+	var size C.size_t
+
+	code := C.communicator_platform_get_file_preview(p.handle, cFileID, &data, &size)
+	if code != C.COMMUNICATOR_SUCCESS {
+		return nil, getLastError()
+	}
+
+	// Convert C bytes to Go slice
+	// Important: We need to copy the data before freeing it
+	goData := C.GoBytes(unsafe.Pointer(data), C.int(size))
+
+	// Free the C-allocated data
+	C.communicator_free_file_data(data, size)
+
+	return goData, nil
+}
+
+// GetFileLink generates a public URL for accessing a file
+// Returns the public URL as a string
+func (p *Platform) GetFileLink(fileID string) (string, error) {
+	cFileID := C.CString(fileID)
+	defer C.free(unsafe.Pointer(cFileID))
+
+	result := C.communicator_platform_get_file_link(p.handle, cFileID)
+	if result == nil {
+		return "", getLastError()
+	}
+
+	defer C.communicator_free_string(result)
+	return C.GoString(result), nil
+}
+
 // WriteFile is a convenience function that writes file data to disk
 func WriteFile(path string, data []byte) error {
 	// Note: We're not using os.WriteFile directly to avoid import cycles
