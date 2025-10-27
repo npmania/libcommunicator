@@ -116,6 +116,10 @@ cargo doc --open
 - Graceful error handling
 - Minimal dependencies
 - Clear ownership semantics across FFI boundary
+- Always run `cargo fmt` and `cargo clippy` before committing code
+- Update `README.md` files (project root and bindings) only when substantive changes occur
+  - Do not make trivial updates (e.g., "comprehensive summary of branch X")
+  - Only update documentation when features, architecture, or usage patterns change meaningfully
 
 ## Dependencies
 
