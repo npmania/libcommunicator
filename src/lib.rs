@@ -1189,6 +1189,253 @@ pub unsafe extern "C" fn communicator_platform_create_direct_channel(
     }
 }
 
+/// FFI function: Create a new regular channel (public or private)
+/// Returns a JSON string representing the created Channel
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+///
+/// # Safety
+/// The caller must ensure that all pointer arguments are valid
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_create_channel(
+    handle: PlatformHandle,
+    team_id: *const c_char,
+    name: *const c_char,
+    display_name: *const c_char,
+    is_private: i32,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || team_id.is_null() || name.is_null() || display_name.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let team_id_str = {
+        match std::ffi::CStr::from_ptr(team_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let name_str = {
+        match std::ffi::CStr::from_ptr(name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let display_name_str = {
+        match std::ffi::CStr::from_ptr(display_name).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+    let is_private_bool = is_private != 0;
+
+    match runtime::block_on(platform.create_channel(
+        team_id_str,
+        name_str,
+        display_name_str,
+        is_private_bool,
+    )) {
+        Ok(channel) => match serde_json::to_string(&channel) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize channel: {e}"),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Update a channel's properties
+/// Returns a JSON string representing the updated Channel
+/// The caller must free the returned string using communicator_free_string()
+/// Returns NULL on error
+///
+/// # Arguments
+/// * `handle` - Platform handle
+/// * `channel_id` - ID of the channel to update
+/// * `display_name` - New display name (NULL to keep unchanged)
+/// * `purpose` - New purpose (NULL to keep unchanged)
+/// * `header` - New header (NULL to keep unchanged)
+///
+/// # Safety
+/// The caller must ensure that all pointer arguments are valid
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_update_channel(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+    display_name: *const c_char,
+    purpose: *const c_char,
+    header: *const c_char,
+) -> *mut c_char {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return std::ptr::null_mut();
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let display_name_opt = if display_name.is_null() {
+        None
+    } else {
+        match std::ffi::CStr::from_ptr(display_name).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let purpose_opt = if purpose.is_null() {
+        None
+    } else {
+        match std::ffi::CStr::from_ptr(purpose).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let header_opt = if header.is_null() {
+        None
+    } else {
+        match std::ffi::CStr::from_ptr(header).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.update_channel(
+        channel_id_str,
+        display_name_opt,
+        purpose_opt,
+        header_opt,
+    )) {
+        Ok(channel) => match serde_json::to_string(&channel) {
+            Ok(json) => match CString::new(json) {
+                Ok(c_string) => c_string.into_raw(),
+                Err(_) => {
+                    error::set_last_error(Error::new(
+                        ErrorCode::OutOfMemory,
+                        "Failed to allocate string",
+                    ));
+                    std::ptr::null_mut()
+                }
+            },
+            Err(e) => {
+                error::set_last_error(Error::new(
+                    ErrorCode::Unknown,
+                    format!("Failed to serialize channel: {e}"),
+                ));
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            error::set_last_error(e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// FFI function: Delete (archive) a channel
+/// Returns ErrorCode indicating success or failure
+///
+/// # Safety
+/// The caller must ensure that all pointer arguments are valid
+#[no_mangle]
+///
+/// # Safety
+/// This function is unsafe because it deals with raw pointers from C.
+/// The caller must ensure all pointer arguments are valid.
+pub unsafe extern "C" fn communicator_platform_delete_channel(
+    handle: PlatformHandle,
+    channel_id: *const c_char,
+) -> ErrorCode {
+    error::clear_last_error();
+
+    if handle.is_null() || channel_id.is_null() {
+        error::set_last_error(Error::null_pointer());
+        return ErrorCode::NullPointer;
+    }
+
+    let channel_id_str = {
+        match std::ffi::CStr::from_ptr(channel_id).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                error::set_last_error(Error::invalid_utf8());
+                return ErrorCode::InvalidUtf8;
+            }
+        }
+    };
+
+    let platform = &**handle;
+
+    match runtime::block_on(platform.delete_channel(channel_id_str)) {
+        Ok(_) => ErrorCode::Success,
+        Err(e) => {
+            let code = e.code;
+            error::set_last_error(e);
+            code
+        }
+    }
+}
+
 /// FFI function: Get all teams the user belongs to
 /// Returns a JSON string representing an array of Teams
 /// The caller must free the returned string using communicator_free_string()
@@ -4337,7 +4584,8 @@ pub unsafe extern "C" fn communicator_platform_search_users(
         }
     };
 
-    let request: platforms::mattermost::UserSearchRequest = match serde_json::from_str(request_str) {
+    let request: platforms::mattermost::UserSearchRequest = match serde_json::from_str(request_str)
+    {
         Ok(r) => r,
         Err(e) => {
             error::set_last_error(Error::new(
@@ -4629,7 +4877,8 @@ pub unsafe extern "C" fn communicator_platform_search_files(
         }
     };
 
-    let _request: platforms::mattermost::FileSearchRequest = match serde_json::from_str(request_str) {
+    let _request: platforms::mattermost::FileSearchRequest = match serde_json::from_str(request_str)
+    {
         Ok(r) => r,
         Err(e) => {
             error::set_last_error(Error::new(
@@ -4645,7 +4894,7 @@ pub unsafe extern "C" fn communicator_platform_search_files(
     // TODO: File search requires Platform trait support - not yet implemented
     // The Platform trait needs a search_files method added
     error::set_last_error(Error::unsupported(
-        "Advanced file search not yet supported by Platform trait"
+        "Advanced file search not yet supported by Platform trait",
     ));
     std::ptr::null_mut()
 }
@@ -4676,7 +4925,8 @@ pub unsafe extern "C" fn communicator_platform_search_posts_advanced(
         }
     };
 
-    let _request: platforms::mattermost::PostSearchOptions = match serde_json::from_str(request_str) {
+    let _request: platforms::mattermost::PostSearchOptions = match serde_json::from_str(request_str)
+    {
         Ok(r) => r,
         Err(e) => {
             error::set_last_error(Error::new(
@@ -4693,7 +4943,7 @@ pub unsafe extern "C" fn communicator_platform_search_posts_advanced(
     // The Platform trait has search_messages(query, limit) but not advanced options
     // To support this properly, need to add search_posts_advanced to the trait
     error::set_last_error(Error::unsupported(
-        "Advanced post search not yet supported by Platform trait"
+        "Advanced post search not yet supported by Platform trait",
     ));
     std::ptr::null_mut()
 }

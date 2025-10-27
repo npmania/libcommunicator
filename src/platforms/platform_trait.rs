@@ -1,6 +1,6 @@
 //! Platform trait defining the interface all platform adapters must implement
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::types::user::UserStatus;
 use crate::types::{Channel, ConnectionInfo, Message, PlatformCapabilities, Team, User};
 use async_trait::async_trait;
@@ -265,6 +265,72 @@ pub trait Platform: Send + Sync {
     /// # Returns
     /// The created or existing DM channel
     async fn create_direct_channel(&self, user_id: &str) -> Result<Channel>;
+
+    /// Create a new regular channel (public or private)
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team/workspace to create the channel in
+    /// * `name` - The channel name (URL-friendly, lowercase, no spaces)
+    /// * `display_name` - The display name shown in the UI
+    /// * `is_private` - Whether to create a private channel (true) or public channel (false)
+    ///
+    /// # Returns
+    /// The created channel
+    ///
+    /// # Default Implementation
+    /// Returns `ErrorCode::Unsupported` by default. Platforms should override this if they support channel creation.
+    async fn create_channel(
+        &self,
+        _team_id: &str,
+        _name: &str,
+        _display_name: &str,
+        _is_private: bool,
+    ) -> Result<Channel> {
+        Err(Error::unsupported(
+            "Channel creation not supported by this platform",
+        ))
+    }
+
+    /// Update a channel's properties
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to update
+    /// * `display_name` - Optional new display name (pass None to keep unchanged)
+    /// * `purpose` - Optional new purpose (pass None to keep unchanged)
+    /// * `header` - Optional new header (pass None to keep unchanged)
+    ///
+    /// # Returns
+    /// The updated channel
+    ///
+    /// # Default Implementation
+    /// Returns `ErrorCode::Unsupported` by default. Platforms should override this if they support channel updates.
+    async fn update_channel(
+        &self,
+        _channel_id: &str,
+        _display_name: Option<&str>,
+        _purpose: Option<&str>,
+        _header: Option<&str>,
+    ) -> Result<Channel> {
+        Err(Error::unsupported(
+            "Channel updates not supported by this platform",
+        ))
+    }
+
+    /// Delete (archive) a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to delete
+    ///
+    /// # Returns
+    /// Result indicating success or failure
+    ///
+    /// # Default Implementation
+    /// Returns `ErrorCode::Unsupported` by default. Platforms should override this if they support channel deletion.
+    async fn delete_channel(&self, _channel_id: &str) -> Result<()> {
+        Err(Error::unsupported(
+            "Channel deletion not supported by this platform",
+        ))
+    }
 
     /// Get all teams/workspaces the user belongs to
     ///

@@ -389,6 +389,97 @@ impl MattermostClient {
         let response = self.get(&endpoint).await?;
         self.handle_response(response).await
     }
+
+    // ========================================================================
+    // Channel CRUD Operations
+    // ========================================================================
+
+    /// Create a new channel (public or private)
+    ///
+    /// # Arguments
+    /// * `team_id` - The ID of the team to create the channel in
+    /// * `name` - The channel name (lowercase, no spaces, URL-friendly)
+    /// * `display_name` - The display name shown in the UI
+    /// * `is_private` - Whether to create a private channel (true) or public channel (false)
+    ///
+    /// # Returns
+    /// A Result containing the created channel or an Error
+    pub async fn create_channel(
+        &self,
+        team_id: &str,
+        name: &str,
+        display_name: &str,
+        is_private: bool,
+    ) -> Result<MattermostChannel> {
+        let channel_type = if is_private { "P" } else { "O" };
+
+        let body = serde_json::json!({
+            "team_id": team_id,
+            "name": name,
+            "display_name": display_name,
+            "type": channel_type,
+        });
+
+        let response = self.post("/channels", &body).await?;
+        self.handle_response(response).await
+    }
+
+    /// Update a channel's properties
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to update
+    /// * `display_name` - Optional new display name (pass None to keep unchanged)
+    /// * `purpose` - Optional new purpose (pass None to keep unchanged)
+    /// * `header` - Optional new header (pass None to keep unchanged)
+    ///
+    /// # Returns
+    /// A Result containing the updated channel or an Error
+    pub async fn update_channel(
+        &self,
+        channel_id: &str,
+        display_name: Option<&str>,
+        purpose: Option<&str>,
+        header: Option<&str>,
+    ) -> Result<MattermostChannel> {
+        // First, get the current channel to build the update request
+        let mut channel = self.get_channel(channel_id).await?;
+
+        // Update only the fields that were provided
+        if let Some(name) = display_name {
+            channel.display_name = name.to_string();
+        }
+        if let Some(p) = purpose {
+            channel.purpose = p.to_string();
+        }
+        if let Some(h) = header {
+            channel.header = h.to_string();
+        }
+
+        let endpoint = format!("/channels/{channel_id}");
+        let response = self.put(&endpoint, &channel).await?;
+        self.handle_response(response).await
+    }
+
+    /// Delete (archive) a channel
+    ///
+    /// # Arguments
+    /// * `channel_id` - The ID of the channel to delete
+    ///
+    /// # Returns
+    /// A Result indicating success or failure
+    pub async fn delete_channel(&self, channel_id: &str) -> Result<()> {
+        let endpoint = format!("/channels/{channel_id}");
+        let response = self.delete(&endpoint).await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(crate::error::Error::new(
+                crate::error::ErrorCode::NetworkError,
+                format!("Failed to delete channel: {}", response.status()),
+            ))
+        }
+    }
 }
 
 #[cfg(test)]

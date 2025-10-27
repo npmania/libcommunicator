@@ -264,6 +264,42 @@ impl Platform for MattermostPlatform {
             .await
     }
 
+    async fn create_channel(
+        &self,
+        team_id: &str,
+        name: &str,
+        display_name: &str,
+        is_private: bool,
+    ) -> Result<Channel> {
+        let mm_channel = self
+            .client
+            .create_channel(team_id, name, display_name, is_private)
+            .await?;
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
+    }
+
+    async fn update_channel(
+        &self,
+        channel_id: &str,
+        display_name: Option<&str>,
+        purpose: Option<&str>,
+        header: Option<&str>,
+    ) -> Result<Channel> {
+        let mm_channel = self
+            .client
+            .update_channel(channel_id, display_name, purpose, header)
+            .await?;
+        let current_user_id = self.client.get_user_id().await;
+        self.convert_channel_with_context(mm_channel, current_user_id.as_deref())
+            .await
+    }
+
+    async fn delete_channel(&self, channel_id: &str) -> Result<()> {
+        self.client.delete_channel(channel_id).await
+    }
+
     async fn get_teams(&self) -> Result<Vec<Team>> {
         let mm_teams = self.client.get_teams().await?;
         Ok(mm_teams.into_iter().map(|t| t.into()).collect())

@@ -442,6 +442,56 @@ char* communicator_platform_create_direct_channel(
 );
 
 /**
+ * Create a new regular channel (public or private)
+ *
+ * @param platform The platform handle
+ * @param team_id The ID of the team/workspace to create the channel in
+ * @param name The channel name (URL-friendly, lowercase, no spaces)
+ * @param display_name The display name shown in the UI
+ * @param is_private Whether to create a private channel (1) or public channel (0)
+ * @return A JSON string representing the created Channel object, or NULL on error
+ *         The caller must free the returned string using communicator_free_string()
+ */
+char* communicator_platform_create_channel(
+    CommunicatorPlatform platform,
+    const char* team_id,
+    const char* name,
+    const char* display_name,
+    int is_private
+);
+
+/**
+ * Update a channel's properties
+ *
+ * @param platform The platform handle
+ * @param channel_id The ID of the channel to update
+ * @param display_name New display name (NULL to keep unchanged)
+ * @param purpose New purpose (NULL to keep unchanged)
+ * @param header New header (NULL to keep unchanged)
+ * @return A JSON string representing the updated Channel object, or NULL on error
+ *         The caller must free the returned string using communicator_free_string()
+ */
+char* communicator_platform_update_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id,
+    const char* display_name,
+    const char* purpose,
+    const char* header
+);
+
+/**
+ * Delete (archive) a channel
+ *
+ * @param platform The platform handle
+ * @param channel_id The ID of the channel to delete
+ * @return Error code indicating success or failure
+ */
+CommunicatorErrorCode communicator_platform_delete_channel(
+    CommunicatorPlatform platform,
+    const char* channel_id
+);
+
+/**
  * Request statuses for all users via WebSocket (async operation)
  *
  * This is a non-blocking operation that returns immediately with a sequence number.
